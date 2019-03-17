@@ -1,7 +1,0 @@
-### Starting build.
-# Target: microc.ml.depends, tags: { package(llvm), package(llvm.analysis), warn(+a-4), extension:ml, file:microc.ml, ocaml, ocamldep, quiet, traverse }
-ocamlfind ocamldep -package llvm -package llvm.analysis -modules microc.ml > microc.ml.depends
-+ ocamlfind ocamldep -package llvm -package llvm.analysis -modules microc.ml > microc.ml.depends
-ocamlfind: Package `llvm' not found
-Command exited with code 2.
-# Compilation unsuccessful.
