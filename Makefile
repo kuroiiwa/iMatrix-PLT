@@ -1,14 +1,14 @@
 # "make test" Compiles everything and runs the regression tests
 
-.PHONY : test
-test : all testall.sh
+#.PHONY : test
+#test : all testall.sh
 #	./testall.sh
 
 # "make all" builds the executable as well as the "printbig" library designed
 # to test linking external code
 
 .PHONY : all
-all : microc.native printbig.o
+all : microc.native
 
 # "make microc.native" compiles the compiler
 #
@@ -30,8 +30,8 @@ clean :
 
 # Testing the "printbig" example
 
-printbig : printbig.c
-	cc -o printbig -DBUILD_TEST printbig.c
+#printbig : printbig.c
+#	cc -o printbig -DBUILD_TEST printbig.c
 
 # Building the tarball
 
