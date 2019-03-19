@@ -13,16 +13,23 @@ module StringMap = Map.Make(String)
 let check (globals, functions) =
 
   (* Verify a list of bindings has no void types or duplicate names *)
+  let checkVoid kind = function
+    | Dcl_no_init(Void, b) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+    | Dcl_init(Void, b, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+    | _ -> ()
+  in
   let check_binds (kind : string) (binds : bind list) =
-    List.iter (function
-	(Void, b) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
-      | _ -> ()) binds;
+    List.iter (checkVoid kind) binds;
+    let extName = function
+      | Dcl_no_init(_, a) -> a
+      | Dcl_init(_, a, _) -> a
+    in
     let rec dups = function
         [] -> ()
-      |	((_,n1) :: (_,n2) :: _) when n1 = n2 ->
-	  raise (Failure ("duplicate " ^ kind ^ " " ^ n1))
+       |  (b1 :: b2 :: _) when (extName b1) = (extName b2) ->
+    raise (Failure ("duplicate " ^ kind ^ " " ^ (extName b1)))
       | _ :: t -> dups t
-    in dups (List.sort (fun (_,a) (_,b) -> compare a b) binds)
+    in dups (List.sort (fun b1 b2 -> compare (extName b1) (extName b2)) binds)
   in
 
   (**** Check global variables ****)
@@ -36,7 +43,7 @@ let check (globals, functions) =
     let add_bind map (name, ty) = StringMap.add name {
       typ = Void;
       fname = name; 
-      formals = [(ty, "x")];
+      formals = [Dcl_no_init(ty, "x")];
       locals = []; body = [] } map
     in List.fold_left add_bind StringMap.empty [ ("print", Int);
 			                         ("printb", Bool);
@@ -80,8 +87,11 @@ let check (globals, functions) =
     in   
 
     (* Build local symbol table of variables for this function *)
-    let symbols = List.fold_left (fun m (ty, name) -> StringMap.add name ty m)
-	                StringMap.empty (globals @ func.formals @ func.locals )
+    let bindAddMap m bind = match bind with
+      | Dcl_no_init(ty, name) -> StringMap.add name ty m
+      | Dcl_init(ty, name, _) -> StringMap.add name ty m
+    in
+    let symbols = List.fold_left bindAddMap StringMap.empty (globals @ func.formals @ func.locals )
     in
 
     (* Return a variable from our local symbol table *)
@@ -141,8 +151,12 @@ let check (globals, functions) =
             let err = "illegal argument found " ^ string_of_typ et ^
               " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
             in (check_assign ft et err, e')
-          in 
-          let args' = List.map2 check_call fd.formals args
+          in
+          let extTy = function
+            | Dcl_no_init(ty, n) -> (ty, n)
+            | Dcl_init(ty, n, _) -> (ty, n)
+          in
+          let args' = List.map2 check_call (List.map extTy fd.formals) args
           in (fd.typ, SCall(fname, args'))
     in
 

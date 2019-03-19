@@ -49,8 +49,10 @@ formals_opt:
   | formal_list   { $1 }
 
 formal_list:
-    typ ID                   { [($1,$2)]     }
-  | formal_list COMMA typ ID { ($3,$4) :: $1 }
+    typ ID                   { [Dcl_no_init($1,$2)]     }
+  | typ ID ASSIGN expr       { [Dcl_init($1,$2,$4)] }
+  | formal_list COMMA typ ID { Dcl_no_init($3,$4) :: $1 }
+  | formal_list COMMA typ ID ASSIGN expr { Dcl_init($3,$4,$6) :: $1 }
 
 typ:
     INT   { Int   }
@@ -63,7 +65,8 @@ vdecl_list:
   | vdecl_list vdecl { $2 :: $1 }
 
 vdecl:
-   typ ID SEMI { ($1, $2) }
+    typ ID SEMI { Dcl_no_init($1, $2) }
+  | typ ID ASSIGN expr SEMI  { Dcl_init($1, $2, $4) }
 
 stmt_list:
     /* nothing */  { [] }

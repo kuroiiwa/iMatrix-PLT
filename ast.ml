@@ -7,8 +7,6 @@ type uop = Neg | Not
 
 type typ = Int | Bool | Float | Void
 
-type bind = typ * string
-
 type expr =
     Literal of int
   | Fliteral of string
@@ -19,6 +17,9 @@ type expr =
   | Assign of string * expr
   | Call of string * expr list
   | Noexpr
+
+type bind = Dcl_no_init of typ * string
+          | Dcl_init of typ * string * expr
 
 type stmt =
     Block of stmt list
@@ -91,11 +92,14 @@ let string_of_typ = function
   | Float -> "float"
   | Void -> "void"
 
-let string_of_vdecl (t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
+let string_of_vdecl  = function 
+  | Dcl_no_init(t, id) -> string_of_typ t ^ " " ^ id ^ ";\n"
+  | Dcl_init(t, id, expr) -> string_of_typ t ^ " " ^ id ^ " = " ^ string_of_expr expr ^ ";\n"
 
 let string_of_fdecl fdecl =
   string_of_typ fdecl.typ ^ " " ^
-  fdecl.fname ^ "(" ^ String.concat ", " (List.map snd fdecl.formals) ^
+  fdecl.fname ^ "(" ^ String.concat ", " (List.map (function Dcl_no_init(_, id) -> id
+                              | Dcl_init(_, id, e) -> id ^ " = " ^ (string_of_expr e)) fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_vdecl fdecl.locals) ^
   String.concat "" (List.map string_of_stmt fdecl.body) ^
