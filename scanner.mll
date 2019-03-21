@@ -8,18 +8,27 @@ let digits = digit+
 rule token = parse
   [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
 | "/*"     { comment lexbuf }           (* Comments *)
-| '('      { LPAREN }
+| "//"     { inlinecom lexbuf }
+| '('      { LPAREN }                   (* () [] {} *)
 | ')'      { RPAREN }
+(*| '['      { LBRACK }
+| ']'      { RBRACK }*)
 | '{'      { LBRACE }
 | '}'      { RBRACE }
-| ';'      { SEMI }
+| ';'      { SEMI }                     (* split *)
 | ','      { COMMA }
-| '+'      { PLUS }
+(*| '.'      { DOT } *)
+| '+'      { PLUS }                     (* arithmatic *)
 | '-'      { MINUS }
 | '*'      { TIMES }
 | '/'      { DIVIDE }
-| '='      { ASSIGN }
-| "=="     { EQ }
+| '%'      { MODULO }
+| '^'      { POWER }
+(* | "++"     { SELFPLUS } *)
+(* | "--"     { SELFMINUS } *)
+(*| "*."     { MATMUL } *)
+| '='      { ASSIGN }                   (* assign *)
+| "=="     { EQ }                       (* logical *)
 | "!="     { NEQ }
 | '<'      { LT }
 | "<="     { LEQ }
@@ -28,23 +37,35 @@ rule token = parse
 | "&&"     { AND }
 | "||"     { OR }
 | "!"      { NOT }
-| "if"     { IF }
+| "if"     { IF }                        (* conditional & loops *)
 | "else"   { ELSE }
 | "for"    { FOR }
 | "while"  { WHILE }
+(*| "break"  { BREAK }
+| "continue"  { CONTINUE } *)
 | "return" { RETURN }
-| "int"    { INT }
+| "int"    { INT }                       (* data type *)
 | "bool"   { BOOL }
 | "float"  { FLOAT }
+| "char"   { CHAR }
+| "string" { STRING }
+(* | "mat"    { MAT } *)
+(* | "img"    { IMG } *)
 | "void"   { VOID }
-| "true"   { BLIT(true)  }
+(* | "struct" { STRUCT } *)
+| "true"   { BLIT(true)  }               (* bool *)
 | "false"  { BLIT(false) }
-| digits as lxm { LITERAL(int_of_string lxm) }
-| digits '.'  digit* ( ['e' 'E'] ['+' '-']? digits )? as lxm { FLIT(lxm) }
-| ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*     as lxm { ID(lxm) }
+| digits as lxm { LITERAL(int_of_string lxm) }  (* int *)
+| digits '.'  digit* ( ['e' 'E'] ['+' '-']? digits )? as lxm { FLIT(lxm) }  (* float *)
+| ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*     as lxm { ID(lxm) }    (* ID *)
+| '"' ([^ '"']* as str) '"'         { STRING_LITERAL(str) }
 | eof { EOF }
 | _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 
 and comment = parse
   "*/" { token lexbuf }
 | _    { comment lexbuf }
+
+and inlinecom = parse
+        ['\r' '\n']           { token lexbuf }
+      | _                     { inlinecom lexbuf}
