@@ -4,12 +4,18 @@
 open Ast
 %}
 
-%token SEMI LPAREN RPAREN LBRACE RBRACE COMMA PLUS MINUS TIMES DIVIDE ASSIGN
-%token NOT EQ NEQ LT LEQ GT GEQ AND OR
-%token RETURN IF ELSE FOR WHILE INT BOOL FLOAT VOID
+%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
+%token SEMI COMMA DOT
+%token PLUS MINUS TIMES DIVIDE MODULO POWER /*SELFPLUS SELFMINUS*/ MATMUL
+%token ASSIGN
+%token EQ NEQ LT LEQ GT GEQ AND OR NOT
+%token IF ELSE FOR WHILE BREAK CONTINUE RETURN
+%token INT BOOL FLOAT CHAR STRING /*MAT IMG*/ VOID /*STRUCT*/
+%token TRUE FALSE
+
 %token <int> LITERAL
 %token <bool> BLIT
-%token <string> ID FLIT
+%token <string> ID FLIT STRING_LITERAL
 %token EOF
 
 %start program
@@ -17,14 +23,15 @@ open Ast
 
 %nonassoc NOELSE
 %nonassoc ELSE
-%right ASSIGN
-%left OR
-%left AND
-%left EQ NEQ
-%left LT GT LEQ GEQ
-%left PLUS MINUS
-%left TIMES DIVIDE
-%right NOT
+%right ASSIGN                     /* precedence level: 1 */
+%left OR                          /* precedence level: 3 */
+%left AND                         /* precedence level: 4 */
+%left EQ NEQ                      /* precedence level: 8 */
+%left LT GT LEQ GEQ               /* precedence level: 9 */
+%left PLUS MINUS                  /* precedence level: 11 */
+%left TIMES DIVIDE MODULO MATMUL POWER /* precedence level: 12 */
+%right NOT                        /* precedence level: 14 */
+%nonassoc SELFPLUS SELFMINUS      /* precedence level: 15 */
 
 %%
 
@@ -37,6 +44,7 @@ decls:
  | decls fdecl { (fst $1, ($2 :: snd $1)) }
 
 fdecl:
+  /* should be able to do vdecl between statement list */
    typ ID LPAREN formals_opt RPAREN LBRACE vdecl_list stmt_list RBRACE
      { { typ = $1;
 	 fname = $2;
@@ -56,6 +64,8 @@ typ:
     INT   { Int   }
   | BOOL  { Bool  }
   | FLOAT { Float }
+  | CHAR  { Char }
+  | STRING { String }
   | VOID  { Void  }
 
 vdecl_list:
@@ -63,7 +73,8 @@ vdecl_list:
   | vdecl_list vdecl { $2 :: $1 }
 
 vdecl:
-   typ ID SEMI { ($1, $2) }
+    typ ID SEMI { normal_val_bind $1 $2 Noexpr }
+  | typ ID ASSIGN expr  { normal_val_bind $1 $2 $4}
 
 stmt_list:
     /* nothing */  { [] }
@@ -88,10 +99,16 @@ expr:
   | FLIT	     { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
   | ID               { Id($1)                 }
+  | ID DOT ID        { Getattr ($1, $3)}        /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }
   | expr MINUS  expr { Binop($1, Sub,   $3)   }
   | expr TIMES  expr { Binop($1, Mult,  $3)   }
   | expr DIVIDE expr { Binop($1, Div,   $3)   }
+  | expr MODULO expr { Binop($1, Mod,   $3)   }
+  | expr POWER  expr { Binop($1, Pow,   $3)   }
+  /* | SELFPLUS expr     { Binop($2, Selfplus)} */
+  /* | SELFMINUS expr    { Binop($2, Selfminus)} */
+  | expr MATMUL expr { Binop($1, Matmul,   $3)   }
   | expr EQ     expr { Binop($1, Equal, $3)   }
   | expr NEQ    expr { Binop($1, Neq,   $3)   }
   | expr LT     expr { Binop($1, Less,  $3)   }
@@ -100,6 +117,8 @@ expr:
   | expr GEQ    expr { Binop($1, Geq,   $3)   }
   | expr AND    expr { Binop($1, And,   $3)   }
   | expr OR     expr { Binop($1, Or,    $3)   }
+  | TRUE             { BoolLit(true) }
+  | FALSE            { BoolLit(false) }
   | MINUS expr %prec NOT { Unop(Neg, $2)      }
   | NOT expr         { Unop(Not, $2)          }
   | ID ASSIGN expr   { Assign($1, $3)         }

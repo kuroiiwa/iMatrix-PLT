@@ -1,13 +1,11 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
-type op = Add | Sub | Mult | Div | Equal | Neq | Less | Leq | Greater | Geq |
+type op = Add | Sub | Mult | Div | Mod | Pow | Selfplus | Selfminus | Matmul | Equal | Neq | Less | Leq | Greater | Geq |
           And | Or
 
 type uop = Neg | Not
 
-type typ = Int | Bool | Float | Void
-
-type bind = typ * string
+type typ = Int | Bool | Float | Char | String | Void
 
 type expr =
     Literal of int
@@ -15,11 +13,22 @@ type expr =
   | BoolLit of bool
   | Id of string
   | Binop of expr * op * expr
+  | Getattr of string * string
   | Unop of uop * expr
   | Assign of string * expr
   | Call of string * expr list
   | Noexpr
 
+type bind = typ * string * (int * int) * expr
+(* type bind = typ * string  *)
+  (* | typ * string * expr *)
+
+
+let normal_val_bind data_type variable_name expr =
+  match data_type with
+    (* Matrix -> failwith("should assign the size for matrix type") *)
+    | _ -> (data_type, variable_name, (-1, -1), expr)
+  
 type stmt =
     Block of stmt list
   | Expr of expr
@@ -36,6 +45,7 @@ type func_decl = {
     body : stmt list;
   }
 
+(* ???? *)
 type program = bind list * func_decl list
 
 (* Pretty-printing functions *)
@@ -45,6 +55,11 @@ let string_of_op = function
   | Sub -> "-"
   | Mult -> "*"
   | Div -> "/"
+  | Mod -> "%"
+  | Pow -> "^"
+  (* | Selfplus -> "++" *)
+  (* | Selfplus -> "--" *)
+  | Matmul -> "*."
   | Equal -> "=="
   | Neq -> "!="
   | Less -> "<"
@@ -66,6 +81,8 @@ let rec string_of_expr = function
   | Id(s) -> s
   | Binop(e1, o, e2) ->
       string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+  | Getattr(e1, e2) ->
+      e1 ^ "." ^ e2
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
   | Call(f, el) ->
@@ -89,13 +106,16 @@ let string_of_typ = function
     Int -> "int"
   | Bool -> "bool"
   | Float -> "float"
+  | Char -> "char"
+  | String -> "string"
   | Void -> "void"
 
-let string_of_vdecl (t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
+let string_of_vdecl (t, id, _, expr) = string_of_typ t ^ " " ^ id ^ " "^ string_of_expr expr ^";\n"
 
 let string_of_fdecl fdecl =
+  let snd4tuple = fun (_, y, _, _) -> y in
   string_of_typ fdecl.typ ^ " " ^
-  fdecl.fname ^ "(" ^ String.concat ", " (List.map snd fdecl.formals) ^
+  fdecl.fname ^ "(" ^ String.concat ", " (List.map snd4tuple fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_vdecl fdecl.locals) ^
   String.concat "" (List.map string_of_stmt fdecl.body) ^
