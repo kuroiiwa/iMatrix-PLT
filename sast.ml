@@ -15,19 +15,20 @@ and sx =
   | SNoexpr
 
 type sstmt =
-    SBlock of sstmt list
+    SBlock of sbody list
   | SExpr of sexpr
   | SReturn of sexpr
   | SIf of sexpr * sstmt * sstmt
   | SFor of sexpr * sexpr * sexpr * sstmt
   | SWhile of sexpr * sstmt
+and sbody = SStmt of sstmt
+           | SDcl of bind
 
 type sfunc_decl = {
     styp : typ;
     sfname : string;
     sformals : bind list;
-    slocals : bind list;
-    sbody : sstmt list;
+    sbody : sbody list;
   }
 
 type sprogram = bind list * sfunc_decl list
@@ -52,7 +53,7 @@ let rec string_of_sexpr (t, e) =
 
 let rec string_of_sstmt = function
     SBlock(stmts) ->
-      "{\n" ^ String.concat "" (List.map string_of_sstmt stmts) ^ "}\n"
+      "{\n" ^ String.concat "" (List.map string_of_sbody stmts) ^ "}\n"
   | SExpr(expr) -> string_of_sexpr expr ^ ";\n";
   | SReturn(expr) -> "return " ^ string_of_sexpr expr ^ ";\n";
   | SIf(e, s, SBlock([])) ->
@@ -63,6 +64,11 @@ let rec string_of_sstmt = function
       "for (" ^ string_of_sexpr e1  ^ " ; " ^ string_of_sexpr e2 ^ " ; " ^
       string_of_sexpr e3  ^ ") " ^ string_of_sstmt s
   | SWhile(e, s) -> "while (" ^ string_of_sexpr e ^ ") " ^ string_of_sstmt s
+and
+ string_of_sbody = function
+  | SDcl(d) -> string_of_vdecl d
+  | SStmt(st) -> string_of_sstmt st
+
 
 let string_of_sfdecl fdecl =
   string_of_typ fdecl.styp ^ " " ^
@@ -70,8 +76,7 @@ let string_of_sfdecl fdecl =
       Dcl_no_init(_, id) -> id
     | Dcl_init(_, id, e) -> id ^ " = " ^ (string_of_expr e)) fdecl.sformals) ^
   ")\n{\n" ^
-  String.concat "" (List.map string_of_vdecl fdecl.slocals) ^
-  String.concat "" (List.map string_of_sstmt fdecl.sbody) ^
+  String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"
 
 let string_of_sprogram (vars, funcs) =

@@ -44,7 +44,7 @@ let check (globals, functions) =
       typ = Void;
       fname = name; 
       formals = [Dcl_no_init(ty, "x")];
-      locals = []; body = [] } map
+      body = [] } map
     in List.fold_left add_bind StringMap.empty [ ("print", Int);
 			                         ("printb", Bool);
 			                         ("printf", Float);
@@ -77,8 +77,31 @@ let check (globals, functions) =
 
   let check_function func =
     (* Make sure no formals or locals are void or duplicates *)
+    let check_body_binds (kind : string) (binds : func_body list) =
+      let checkVoid kind = function
+        | Dcl(Dcl_no_init(Void, b)) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+        | Dcl(Dcl_init(Void, b, _)) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+        | _ -> ()
+      in
+      List.iter (checkVoid kind) binds;
+      let pick_binds lst = function
+        | Dcl(dcl) -> dcl :: lst
+        | _ -> lst
+      in
+      let binds_list = List.fold_left pick_binds [] binds in 
+      let extName = function
+        | Dcl_no_init(_, a) -> a
+        | Dcl_init(_, a, _) -> a
+      in
+      let rec dups = function
+         [] -> ()
+        |  (b1 :: b2 :: _) when (extName b1) = (extName b2) ->
+      raise (Failure ("duplicate " ^ kind ^ " " ^ (extName b1)))
+        | _ :: t -> dups t
+      in dups (List.sort (fun b1 b2 -> compare (extName b1) (extName b2)) binds_list)
+    in
+    check_body_binds "local" func.body;
     check_binds "formal" func.formals;
-    check_binds "local" func.locals;
 
     (* Raise an exception if the given rvalue type cannot be assigned to
        the given lvalue type *)
@@ -91,7 +114,12 @@ let check (globals, functions) =
       | Dcl_no_init(ty, name) -> StringMap.add name ty m
       | Dcl_init(ty, name, _) -> StringMap.add name ty m
     in
-    let symbols = List.fold_left bindAddMap StringMap.empty (globals @ func.formals @ func.locals )
+    let pick_binds lst = function
+      | Dcl(dcl) -> dcl :: lst
+      | _ -> lst
+    in
+    let fbody = List.rev (List.fold_left pick_binds [] func.body) in 
+    let symbols = List.fold_left bindAddMap StringMap.empty (globals @ func.formals @ fbody )
     in
 
     (* Return a variable from our local symbol table *)
@@ -181,22 +209,18 @@ let check (globals, functions) =
 	    
 	    (* A block is correct if each statement is correct and nothing
 	       follows any Return statement.  Nested blocks are flattened. *)
-      | Block sl -> 
-          let rec check_stmt_list = function
-              [Return _ as s] -> [check_stmt s]
-            | Return _ :: _   -> raise (Failure "nothing may follow a return")
-            | Block sl :: ss  -> check_stmt_list (sl @ ss) (* Flatten blocks *)
-            | s :: ss         -> check_stmt s :: check_stmt_list ss
-            | []              -> []
-          in SBlock(check_stmt_list sl)
-
+      | Block sl -> SBlock(check_sbody sl)
+    and  check_sbody = function
+      | [Stmt(Return _ as s)] -> [SStmt(check_stmt s)]
+      | Stmt(Return _) :: _ -> raise (Failure "nothing may follow a return")
+      | Stmt(Block sl) :: ss -> check_sbody (sl @ ss)
+      | Stmt(st) :: ss -> SStmt(check_stmt st) :: check_sbody ss
+      | Dcl(dl) :: ss -> SDcl(dl) :: check_sbody ss
+      | [] -> []
     in (* body of check_function *)
     { styp = func.typ;
       sfname = func.fname;
       sformals = func.formals;
-      slocals  = func.locals;
-      sbody = match check_stmt (Block func.body) with
-	SBlock(sl) -> sl
-      | _ -> raise (Failure ("internal error: block didn't become a block?"))
+      sbody = check_sbody func.body;
     }
   in (globals, List.map check_function functions)

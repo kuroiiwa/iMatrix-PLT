@@ -37,12 +37,11 @@ decls:
  | decls fdecl { (fst $1, ($2 :: snd $1)) }
 
 fdecl:
-   typ ID LPAREN formals_opt RPAREN LBRACE vdecl_list stmt_list RBRACE
+   typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
      { { typ = $1;
 	 fname = $2;
 	 formals = List.rev $4;
-	 locals = List.rev $7;
-	 body = List.rev $8 } }
+	 body = List.rev $7 }}
 
 formals_opt:
     /* nothing */ { [] }
@@ -60,22 +59,19 @@ typ:
   | FLOAT { Float }
   | VOID  { Void  }
 
-vdecl_list:
-    /* nothing */    { [] }
-  | vdecl_list vdecl { $2 :: $1 }
+func_body_list:
+    /* nothing */ { [] }
+  | func_body_list stmt  { Stmt($2) :: $1 }
+  | func_body_list vdecl { Dcl($2) :: $1 }
 
 vdecl:
     typ ID SEMI { Dcl_no_init($1, $2) }
   | typ ID ASSIGN expr SEMI  { Dcl_init($1, $2, $4) }
 
-stmt_list:
-    /* nothing */  { [] }
-  | stmt_list stmt { $2 :: $1 }
-
 stmt:
     expr SEMI                               { Expr $1               }
   | RETURN expr_opt SEMI                    { Return $2             }
-  | LBRACE stmt_list RBRACE                 { Block(List.rev $2)    }
+  | LBRACE func_body_list RBRACE                 { Block(List.rev $2)    }
   | IF LPAREN expr RPAREN stmt %prec NOELSE { If($3, $5, Block([])) }
   | IF LPAREN expr RPAREN stmt ELSE stmt    { If($3, $5, $7)        }
   | FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN stmt

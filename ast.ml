@@ -22,19 +22,19 @@ type bind = Dcl_no_init of typ * string
           | Dcl_init of typ * string * expr
 
 type stmt =
-    Block of stmt list
+    Block of func_body list
   | Expr of expr
   | Return of expr
   | If of expr * stmt * stmt
   | For of expr * expr * expr * stmt
   | While of expr * stmt
+and func_body = Dcl of bind | Stmt of stmt
 
 type func_decl = {
     typ : typ;
     fname : string;
     formals : bind list;
-    locals : bind list;
-    body : stmt list;
+    body : func_body list;
   }
 
 type program = bind list * func_decl list
@@ -73,19 +73,6 @@ let rec string_of_expr = function
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Noexpr -> ""
 
-let rec string_of_stmt = function
-    Block(stmts) ->
-      "{\n" ^ String.concat "" (List.map string_of_stmt stmts) ^ "}\n"
-  | Expr(expr) -> string_of_expr expr ^ ";\n";
-  | Return(expr) -> "return " ^ string_of_expr expr ^ ";\n";
-  | If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^ string_of_stmt s
-  | If(e, s1, s2) ->  "if (" ^ string_of_expr e ^ ")\n" ^
-      string_of_stmt s1 ^ "else\n" ^ string_of_stmt s2
-  | For(e1, e2, e3, s) ->
-      "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
-      string_of_expr e3  ^ ") " ^ string_of_stmt s
-  | While(e, s) -> "while (" ^ string_of_expr e ^ ") " ^ string_of_stmt s
-
 let string_of_typ = function
     Int -> "int"
   | Bool -> "bool"
@@ -96,13 +83,30 @@ let string_of_vdecl  = function
   | Dcl_no_init(t, id) -> string_of_typ t ^ " " ^ id ^ ";\n"
   | Dcl_init(t, id, expr) -> string_of_typ t ^ " " ^ id ^ " = " ^ string_of_expr expr ^ ";\n"
 
+let rec string_of_stmt = function
+    Block(stmts) ->
+      "{\n" ^ String.concat "" (List.map string_of_func_body stmts) ^ "}\n"
+  | Expr(expr) -> string_of_expr expr ^ ";\n";
+  | Return(expr) -> "return " ^ string_of_expr expr ^ ";\n";
+  | If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^ string_of_stmt s
+  | If(e, s1, s2) ->  "if (" ^ string_of_expr e ^ ")\n" ^
+      string_of_stmt s1 ^ "else\n" ^ string_of_stmt s2
+  | For(e1, e2, e3, s) ->
+      "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
+      string_of_expr e3  ^ ") " ^ string_of_stmt s
+  | While(e, s) -> "while (" ^ string_of_expr e ^ ") " ^ string_of_stmt s
+and
+ string_of_func_body = function
+  | Dcl(d) -> string_of_vdecl d
+  | Stmt(st) -> string_of_stmt st
+
+
 let string_of_fdecl fdecl =
   string_of_typ fdecl.typ ^ " " ^
   fdecl.fname ^ "(" ^ String.concat ", " (List.map (function Dcl_no_init(_, id) -> id
                               | Dcl_init(_, id, e) -> id ^ " = " ^ (string_of_expr e)) fdecl.formals) ^
   ")\n{\n" ^
-  String.concat "" (List.map string_of_vdecl fdecl.locals) ^
-  String.concat "" (List.map string_of_stmt fdecl.body) ^
+  String.concat "" (List.map string_of_func_body fdecl.body) ^
   "}\n"
 
 let string_of_program (vars, funcs) =
