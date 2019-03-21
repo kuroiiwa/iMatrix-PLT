@@ -130,7 +130,7 @@ let string_of_fdecl fdecl =
 
 let string_of_program lst =
   let helper str = function
-  | Globaldcl(dcl) -> string_of_vdecl dcl ^ str
-  | Func(f) -> string_of_fdecl f ^ str
+  | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
+  | Func(f) -> str ^ string_of_fdecl f
   in
   List.fold_left helper "" lst

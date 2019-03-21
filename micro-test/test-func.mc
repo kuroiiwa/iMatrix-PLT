@@ -1,17 +1,22 @@
 void testfunc(int a = 2, int b) {
 	
 }
+
 int c;
+
 
 int main() {
 
-	float a = 1;
-	a = 10.0;
-	float b;
-	b = 20.0;
+	int a = 1;
+	a = 10;
+	int b;
+	b = 20;
 	a % b;
 	c ^ a;
-	printf(a);
-	testfunc(1, 2);
+	int i;
+	{
+		a = 65;
+	}
+
     return 0;
 }

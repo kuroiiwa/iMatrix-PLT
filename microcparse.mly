@@ -38,7 +38,7 @@ let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-
 %%
 
 program:
-  decls EOF { $1 }
+  decls EOF { List.rev $1 }
 
 decls:
    /* nothing */ { []              }

@@ -31,7 +31,10 @@ type sfunc_decl = {
     sbody : sbody list;
   }
 
-type sprogram = bind list * sfunc_decl list
+type sprog_element = SGlobaldcl of bind
+                  | SFunc of sfunc_decl
+
+type sprogram = sprog_element list
 
 (* Pretty-printing functions *)
 
@@ -49,7 +52,7 @@ let rec string_of_sexpr (t, e) =
   | SCall(f, el) ->
       f ^ "(" ^ String.concat ", " (List.map string_of_sexpr el) ^ ")"
   | SNoexpr -> ""
-				  ) ^ ")"				     
+          ) ^ ")"            
 
 let rec string_of_sstmt = function
     SBlock(stmts) ->
@@ -71,14 +74,16 @@ and
 
 
 let string_of_sfdecl fdecl =
+  let snd4tuple = fun (_, y, _, _) -> y in
   string_of_typ fdecl.styp ^ " " ^
-  fdecl.sfname ^ "(" ^ String.concat ", " (List.map (function
-      Dcl_no_init(_, id) -> id
-    | Dcl_init(_, id, e) -> id ^ " = " ^ (string_of_expr e)) fdecl.sformals) ^
+  fdecl.sfname ^ "(" ^ String.concat ", " (List.map snd4tuple fdecl.sformals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"
 
-let string_of_sprogram (vars, funcs) =
-  String.concat "" (List.map string_of_vdecl vars) ^ "\n" ^
-  String.concat "\n" (List.map string_of_sfdecl funcs)
+let string_of_sprogram lst =
+  let helper str = function
+    | SGlobaldcl(dcl) -> str ^ string_of_vdecl dcl
+    | SFunc(f) -> str ^ string_of_sfdecl f
+  in
+  List.fold_left helper "" lst
