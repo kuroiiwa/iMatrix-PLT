@@ -74,9 +74,8 @@ and
 
 
 let string_of_sfdecl fdecl =
-  let snd4tuple = fun (_, y, _, _) -> y in
   string_of_typ fdecl.styp ^ " " ^
-  fdecl.sfname ^ "(" ^ String.concat ", " (List.map snd4tuple fdecl.sformals) ^
+  fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.sformals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"

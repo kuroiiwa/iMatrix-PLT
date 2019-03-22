@@ -208,10 +208,11 @@ let check program =
       sbody = List.rev lst }
   in
 
-
+(*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
     | Globaldcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl((ty, id, e1, e2)) :: prog_sast)
-    | Func(f) -> (var_symbols, add_func func_symbols f, (check_function (var_symbols, func_symbols) f) :: prog_sast)
+    | Func(f) -> let new_func_symbols = add_func func_symbols f in
+    (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
 
   in
 

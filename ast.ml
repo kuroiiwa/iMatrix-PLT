@@ -99,7 +99,9 @@ let string_of_typ = function
   | String -> "string"
   | Void -> "void"
 
-let string_of_vdecl (t, id, _, expr) = string_of_typ t ^ " " ^ id ^ " "^ string_of_expr expr ^";\n"
+let string_of_vdecl (t, id, _, expr) = match expr with
+  | Noexpr -> string_of_typ t ^ " " ^ id ^ ";\n"
+  | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_expr expr ^";\n"
 
 let rec string_of_stmt = function
     Block(stmts) ->
@@ -118,11 +120,13 @@ and
   | Dcl(d) -> string_of_vdecl d
   | Stmt(st) -> string_of_stmt st
 
+let string_of_formals = function
+    | (ty, y, _, Noexpr) -> string_of_typ ty ^ " " ^ y
+    | (ty, y, _, e) -> string_of_typ ty ^ " " ^ y ^ " = " ^ string_of_expr e
 
 let string_of_fdecl fdecl =
-  let snd4tuple = fun (_, y, _, _) -> y in
   string_of_typ fdecl.typ ^ " " ^
-  fdecl.fname ^ "(" ^ String.concat ", " (List.map snd4tuple fdecl.formals) ^
+  fdecl.fname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_func_body fdecl.body) ^
   "}\n"

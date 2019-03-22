@@ -2,8 +2,7 @@ void testfunc(int a = 2, int b) {
 	
 }
 
-int c;
-
+int c = 2;
 
 int main() {
 
@@ -19,4 +18,9 @@ int main() {
 	}
 
     return 0;
+}
+
+void test1() {
+	int a = 20;
+	test1();
 }
