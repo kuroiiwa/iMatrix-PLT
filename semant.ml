@@ -77,7 +77,7 @@ let check program =
         | Stmt(Block(lst)) -> check_body_binds kind lst
         | _ -> ()
       in
-      List.iter (checkVoid kind) funct.body;
+      List.iter (checkVoid kind) binds;
 
       let rec pick_binds lst = function
         | Dcl(dcl) -> dcl :: lst
@@ -186,11 +186,12 @@ let check program =
     Failure ("return gives " ^ string_of_typ t ^ " expected " ^
        string_of_typ funct.typ ^ " in " ^ string_of_expr e))
       | Block sl -> 
-        let check_return = function
+(*       There could be multiple returns *)
+(*         let check_return = function
           | Stmt(Return _) :: _   -> raise (Failure "nothing may follow a return")
           | _ -> ()
         in 
-        let () = check_return sl in
+        let () = check_return sl in *)
         let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
         SBlock(List.rev lst)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
