@@ -7,7 +7,6 @@ module StringMap = Map.Make(String)
 
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong.
-
    Check each global variable, then check each function *)
 
 let check program =
@@ -38,6 +37,7 @@ let check program =
 
   (**** Check functions ****)
 
+  (**** Collect all built-in functions at first ****)
   let built_in_decls = 
     let add_bind map (name, ty) = StringMap.add name {
       typ = Void;
@@ -50,7 +50,7 @@ let check program =
                                ("printbig", Int) ]
   in
 
-
+  (**** Add func to func_symbols with error handler ****)
   let add_func map fd = 
     let built_in_err = "function " ^ fd.fname ^ " may not be defined"
     and dup_err = "duplicate function " ^ fd.fname
@@ -110,6 +110,7 @@ let check program =
     in
 
 
+    (**** Check expr including type and function call correctness ****)
     let rec check_expr (var_symbols, func_symbols) = function
         Literal  l -> (Int, SLiteral l)
       | Fliteral l -> (Float, SFliteral l)
@@ -165,6 +166,7 @@ let check program =
           in (fd.typ, SCall(fname, args'))
     in
 
+    (**** Check if a expr is bool type ****)
     let check_bool_expr (var_symbols, func_symbols) e = 
       let (t', e') = check_expr (var_symbols, func_symbols) e
       and err = "expected Boolean expression in " ^ string_of_expr e
@@ -185,22 +187,31 @@ let check program =
         else raise (
     Failure ("return gives " ^ string_of_typ t ^ " expected " ^
        string_of_typ funct.typ ^ " in " ^ string_of_expr e))
-      | Block sl -> 
-(*       There could be multiple returns *)
-(*         let check_return = function
-          | Stmt(Return _) :: _   -> raise (Failure "nothing may follow a return")
-          | _ -> ()
-        in 
-        let () = check_return sl in *)
-        let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
+      | Block sl -> let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
         SBlock(List.rev lst)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
       | Dcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SDcl((ty, id, e1, e2)) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
+    (****      There could be multiple returns ****)
+    (**** Check all return in main block and sub block ****)
+    let rec pick_return lst = function
+      | Stmt(Return(_) as r_st) -> r_st :: lst
+      | Stmt(Block(stmts)) -> (List.fold_left pick_return [] stmts) @ lst
+      | _ -> lst
+    in
+    let return_lst = List.fold_left pick_return [] funct.body in
+    let check_return = function
+      | [] when funct.typ <> Void -> raise (Failure ("No return in main block of function " ^ funct.fname))
+      | l -> List.map (check_stmt (var_symbols, func_symbols)) l
+    in
+    let _ = check_return return_lst in
+
+   (* Check function body line by line while maintaining var and func symbol tables*)
     let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) funct.body in
 
+    (* Return SFunc required in SAST *)
     SFunc{
       styp = funct.typ;
       sfname = funct.fname;
@@ -216,6 +227,7 @@ let check program =
 
   in
 
+  (* Check program line by line while maintaining var and func symbol tables*)
   let (_, f, lst) = List.fold_left check_prog_ele (StringMap.empty, built_in_decls, []) program in
 
   let _ = find_func f "main" in (* Ensure "main" is defined *)

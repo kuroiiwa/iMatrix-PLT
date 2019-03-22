@@ -20,7 +20,9 @@ int main() {
     return 0;
 }
 
-void test1() {
+int test1() {
 	int a = 20;
+	if (true) return 1;
 	test1();
+	return 1;
 }
