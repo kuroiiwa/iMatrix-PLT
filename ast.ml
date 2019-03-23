@@ -5,7 +5,7 @@ type op = Add | Sub | Mult | Div | Mod | Pow | (*Selfplus | Selfminus | Matmul |
 
 type uop = Neg | Not
 
-type typ = Int | Bool | Float | Char | String | Void
+type typ = Int | Bool | Float | Char | String | Mat | Img | Void
 
 type expr =
     Literal of int
@@ -22,8 +22,11 @@ type expr =
   | Noexpr
 
 type dim = int * int * int
+type dim_expr = expr * expr * expr
 
-type bind =  typ * string * dim * expr
+type bind =  CommonBind of typ * string * dim * expr
+            | MatBind of typ * string * dim_expr
+            | ImgBind of typ * string * dim_expr
 
 
     (* Matrix -> failwith("should assign the size for matrix type") *)
@@ -49,8 +52,10 @@ type prog_element = Globaldcl of bind
 
 type program = prog_element list
 
-
-
+(* Helper functions *)
+let fst3tuple = function (fst, _, _) -> fst 
+let snd3tuple = function (_, snd, _) -> snd  
+let trd3tuple = function (_, _, trd) -> trd 
 
 (* Pretty-printing functions *)
 
@@ -101,11 +106,24 @@ let string_of_typ = function
   | Float -> "float"
   | Char -> "char"
   | String -> "string"
+  | Mat -> "mat"
+  | Img -> "img"
   | Void -> "void"
 
-let string_of_vdecl (t, id, _, expr) = match expr with
-  | Noexpr -> string_of_typ t ^ " " ^ id ^ ";\n"
-  | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_expr expr ^";\n"
+let string_of_vdecl bind_expr = 
+  match bind_expr with 
+    MatBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+        "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
+        string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
+        string_of_expr (trd3tuple dim_expr) ^ ");\n"
+  | ImgBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+        "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
+        string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
+        string_of_expr (trd3tuple dim_expr) ^ ");\n"
+  | CommonBind (t, id, _, expr) ->  
+      match expr with
+      | Noexpr -> string_of_typ t ^ " " ^ id ^ ";\n"
+      | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_expr expr ^";\n"
 
 let rec string_of_stmt = function
     Block(stmts) ->
@@ -125,8 +143,16 @@ and
   | Stmt(st) -> string_of_stmt st
 
 let string_of_formals = function
-    | (ty, y, _, Noexpr) -> string_of_typ ty ^ " " ^ y
-    | (ty, y, _, e) -> string_of_typ ty ^ " " ^ y ^ " = " ^ string_of_expr e
+    | CommonBind(ty, y, _, Noexpr) -> string_of_typ ty ^ " " ^ y
+    | CommonBind(ty, y, _, expr) -> string_of_typ ty ^ " " ^ y ^ " = " ^ string_of_expr expr
+    | MatBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+        "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
+        string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
+        string_of_expr (trd3tuple dim_expr) ^ ")"
+    | ImgBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+        "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
+        string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
+        string_of_expr (trd3tuple dim_expr) ^ ")"
 
 let string_of_fdecl fdecl =
   string_of_typ fdecl.typ ^ " " ^

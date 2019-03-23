@@ -3,7 +3,15 @@
 %{
 open Ast
 
-let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-1, -1, -1), expr)
+let bind_dcl = fun data_type variable_name expr -> CommonBind(data_type, variable_name, (-1, -1, -1), expr)
+let bind_mat_img = let fst3tuple = function (fst, _, _) -> fst in
+                   let snd3tuple = function (_, snd, _) -> snd in 
+                   let trd3tuple = function (_, _, trd) -> trd in
+                   fun data_type variable_name dimension -> 
+                    match data_type with 
+                    | Mat -> MatBind(data_type, variable_name, (fst3tuple dimension, snd3tuple dimension, trd3tuple dimension))
+                    | Img -> ImgBind(data_type, variable_name, (fst3tuple dimension, snd3tuple dimension, trd3tuple dimension))
+                    | _ -> raise (Failure("Given type does not match MAT / IMG"))
 %}
 
 %token LPAREN RPAREN /* LBRACK RBRACK */ LBRACE RBRACE
@@ -12,7 +20,7 @@ let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
 %token IF ELSE FOR WHILE /* BREAK CONTINUE */ RETURN
-%token INT BOOL FLOAT CHAR STRING /*MAT IMG*/ VOID /*STRUCT*/
+%token INT BOOL FLOAT CHAR STRING MAT IMG VOID /*STRUCT*/
 %token TRUE FALSE
 
 %token <int> LITERAL
@@ -69,6 +77,8 @@ typ:
   | FLOAT { Float }
   | CHAR  { Char }
   | STRING { String }
+  | MAT   { Mat }
+  | IMG   { Img }
   | VOID  { Void  }
 
 func_body_list:
@@ -79,6 +89,12 @@ func_body_list:
 vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
+  | typ ID LPAREN dimension RPAREN SEMI {bind_mat_img $1 $2 $4}
+
+dimension:
+    expr                          { (Literal(-1), Literal(-1), $1) }
+  | expr COMMA expr               { (Literal(-1), $1, $3) }
+  | expr COMMA expr COMMA expr    { ($1, $3, $5) }
 
 stmt:
     expr SEMI                               { Expr $1               }
