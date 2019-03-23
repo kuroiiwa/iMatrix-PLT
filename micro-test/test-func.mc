@@ -22,7 +22,9 @@ int main() {
 
 int test1() {
 	int a = 20;
-	if (true) return 1;
-	test1();
-	return 1;
+	if (true)
+		return 2;
+	{
+
+	}
 }

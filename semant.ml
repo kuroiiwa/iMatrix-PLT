@@ -189,22 +189,34 @@ let check program =
        string_of_typ funct.typ ^ " in " ^ string_of_expr e))
       | Block sl -> let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
         SBlock(List.rev lst)
+    (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
       | Dcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SDcl((ty, id, e1, e2)) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
     (****      There could be multiple returns ****)
-    (**** Check all return in main block and sub block ****)
-    let rec pick_return lst = function
+    (**** Check all return in all statements ****)
+    (**** Return could only be absent in void function ****)
+    let rec pick_ret_in_func_body lst = function
       | Stmt(Return(_) as r_st) -> r_st :: lst
-      | Stmt(Block(stmts)) -> (List.fold_left pick_return [] stmts) @ lst
+      | Stmt(Block(stmts)) -> (List.fold_left pick_ret_in_func_body [] stmts) @ lst
+      | Stmt(If(_, b1, b2)) -> (pick_ret_in_stmt b1) @ (pick_ret_in_stmt b2) @ lst
+      | Stmt(For(_, _, _, st)) -> (pick_ret_in_stmt st) @ lst
+      | Stmt(While(_, st)) -> (pick_ret_in_stmt st) @ lst
       | _ -> lst
+    and pick_ret_in_stmt = function
+      | (Return _) as r_st -> [r_st]
+      | Block(stmts) -> List.fold_left pick_ret_in_func_body [] stmts
+      | If(_, b1, b2) -> (pick_ret_in_stmt b1) @ (pick_ret_in_stmt b2)
+      | For(_, _, _, st) -> pick_ret_in_stmt st
+      | While(_, st) -> pick_ret_in_stmt st
+      | _ -> []
     in
-    let return_lst = List.fold_left pick_return [] funct.body in
+    let return_lst = List.fold_left pick_ret_in_func_body [] funct.body in
     let check_return = function
       | [] when funct.typ <> Void -> raise (Failure ("No return in main block of function " ^ funct.fname))
-      | l -> List.map (check_stmt (var_symbols, func_symbols)) l
+      | _ -> ()
     in
     let _ = check_return return_lst in
 
