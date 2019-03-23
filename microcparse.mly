@@ -17,7 +17,8 @@ let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-
 
 %token <int> LITERAL
 %token <bool> BLIT
-%token <string> ID FLIT STRING_LITERAL
+%token <string> ID FLIT STRLIT
+%token <char> CHARLIT
 %token EOF
 
 %start program
@@ -95,8 +96,10 @@ expr_opt:
 
 expr:
     LITERAL          { Literal($1)            }
-  | FLIT	     { Fliteral($1)           }
+  | FLIT	           { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
+  | STRLIT           { StrLit($1)             }
+  | CHARLIT          { CharLit($1)            }
   | ID               { Id($1)                 }
  /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }

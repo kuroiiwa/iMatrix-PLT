@@ -11,6 +11,8 @@ type expr =
     Literal of int
   | Fliteral of string
   | BoolLit of bool
+  | StrLit of string
+  | CharLit of char
   | Id of string
   | Binop of expr * op * expr
  (* | Getattr of string * string *)
@@ -78,6 +80,8 @@ let string_of_uop = function
 let rec string_of_expr = function
     Literal(l) -> string_of_int l
   | Fliteral(l) -> l
+  | StrLit(l) -> l
+  | CharLit(c) -> String.make 1 c
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
   | Id(s) -> s

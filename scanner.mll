@@ -58,7 +58,8 @@ rule token = parse
 | digits as lxm { LITERAL(int_of_string lxm) }  (* int *)
 | digits '.'  digit* ( ['e' 'E'] ['+' '-']? digits )? as lxm { FLIT(lxm) }  (* float *)
 | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']*     as lxm { ID(lxm) }    (* ID *)
-| '"' ([^ '"']* as str) '"'         { STRING_LITERAL(str) }
+| ''' (_ as ch) '''         { CHARLIT(ch)}
+| '"' ([^ '"']* as str) '"'         { STRLIT(str) }
 | eof { EOF }
 | _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 
@@ -67,5 +68,5 @@ and comment = parse
 | _    { comment lexbuf }
 
 and inlinecom = parse
-        ['\r' '\n']           { token lexbuf }
-      | _                     { inlinecom lexbuf}
+    ['\r' '\n']           { token lexbuf }
+  | _                     { inlinecom lexbuf}

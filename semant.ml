@@ -114,6 +114,8 @@ let check program =
     let rec check_expr (var_symbols, func_symbols) = function
         Literal  l -> (Int, SLiteral l)
       | Fliteral l -> (Float, SFliteral l)
+      | StrLit str -> (String, SStrLit str)
+      | CharLit ch -> (Char, SCharLit ch)
       | BoolLit l  -> (Bool, SBoolLit l)
       | Noexpr     -> (Void, SNoexpr)
       | Id s       -> (type_of_identifier var_symbols s, SId s)
