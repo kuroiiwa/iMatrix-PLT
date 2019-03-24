@@ -14,11 +14,14 @@ let check program =
   (* Verify a list of bindings has no void types or duplicate names *)
   let check_binds (kind : string) (binds : bind list) =
     let checkVoid kind = function
-      | (Void, b, _, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+      | CommonBind(Void, b, _, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
       | _ -> ()
     in
     List.iter (checkVoid kind) binds;
-    let extName = fun (_, id, _, _) -> id in
+    let extName = function
+      | CommonBind(_, id, _, _) -> id 
+      | MatBind(_, id, _) -> id 
+      | ImgBind(_, id, _) -> id in
     let rec dups = function
         [] -> ()
       |  (b1 :: b2 :: _) when (extName b1) = (extName b2) ->
@@ -42,11 +45,13 @@ let check program =
     let add_bind map (name, ty) = StringMap.add name {
       typ = Void;
       fname = name; 
-      formals = [(ty, "x", (-1,-1,-1), Noexpr)];
+      formals = [CommonBind(ty, "x", (-1,-1,-1), Noexpr)];
       body = [] } map
     in List.fold_left add_bind StringMap.empty [ ("print", Int);
                                ("printb", Bool);
                                ("printf", Float);
+                               ("printmat", Mat);
+                               ("printimg", Img);
                                ("printbig", Int) ]
   in
 
@@ -73,7 +78,7 @@ let check program =
     (* Make sure no formals or locals are void or duplicates *)
     let rec check_body_binds (kind : string) (binds : func_body list) =
       let checkVoid kind = function
-        | Dcl(Void, b, _, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
+        | Dcl(CommonBind(Void, b, _, _)) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
         | Stmt(Block(lst)) -> check_body_binds kind lst
         | _ -> ()
       in
@@ -85,7 +90,10 @@ let check program =
         | _ -> lst
       in
       let binds_list = List.fold_left pick_binds [] binds in 
-      let extName = fun (_, id, _, _) -> id in
+      let extName = function
+        | CommonBind(_, id, _, _) -> id 
+        | MatBind(_, id, _) -> id 
+        | ImgBind(_, id, _) -> id in
       let rec dups = function
          [] -> ()
         |  (b1 :: b2 :: _) when (extName b1) = (extName b2) ->
@@ -158,11 +166,15 @@ let check program =
           if List.length args != param_length then
             raise (Failure ("expecting " ^ string_of_int param_length ^ 
                             " arguments in " ^ string_of_expr call))
-          else let check_call (ft, _, _, _) e = 
+          else let check_call bind_instance e = 
             let (et, e') = check_expr (var_symbols, func_symbols) e in 
-            let err = "illegal argument found " ^ string_of_typ et ^
-              " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
-            in (check_assign ft et err, e')
+            match bind_instance with
+            | CommonBind(ft, _, _, _) ->
+              let err = "illegal argument found " ^ string_of_typ et ^
+                " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
+              in (check_assign ft et err, e')
+            | MatBind(t, _, _) -> (t, e')
+            | ImgBind(t, _, _) -> (t, e')
           in
           let args' = List.map2 check_call fd.formals args
           in (fd.typ, SCall(fname, args'))
@@ -193,8 +205,14 @@ let check program =
         SBlock(List.rev lst)
     (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
-      | Dcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SDcl((ty, id, e1, e2)) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
+      | Dcl(dcl) -> match dcl with
+        | CommonBind((ty, id, e1, e2)) ->
+          ((StringMap.add id ty var_symbols), func_symbols, SDcl(CommonBind(ty, id, e1, e2)) :: body_sast)
+        | MatBind((ty, id, d)) ->
+          ((StringMap.add id ty var_symbols), func_symbols, SDcl(MatBind(ty, id, d)) :: body_sast)
+        | ImgBind((ty, id, d)) ->
+          ((StringMap.add id ty var_symbols), func_symbols, SDcl(ImgBind(ty, id, d)) :: body_sast)
     in
 
     (****      There could be multiple returns ****)
@@ -235,9 +253,16 @@ let check program =
 
 (*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
-    | Globaldcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl((ty, id, e1, e2)) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
-    (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
+      (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
+    | Globaldcl(dcl) -> match dcl with
+      | CommonBind(ty, id, e1, e2) -> 
+        ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(CommonBind(ty, id, e1, e2)) :: prog_sast)
+      | MatBind(ty, id, d) -> 
+        ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(MatBind(ty, id, d)) :: prog_sast)
+      | ImgBind(ty, id, d) -> 
+        ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(ImgBind(ty, id, d)) :: prog_sast)
+
 
   in
 
