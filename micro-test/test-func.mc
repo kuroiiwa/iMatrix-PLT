@@ -1,17 +1,25 @@
-void testfunc(int a = 2, int b) {
-	
+
+int g = 1;
+float asd = 1.2;
+
+int test(int a, int b) {
+	a = 10;
+	{
+		int c;
+		c = 5;
+		printall(c);
+	}
+	printall(b);
+	printall("Hello World");
+	return 1;
 }
 
 
 int main() {
-
-	char a;
-	int b;
-	b = 2;
-	a = 't';
-	a = '"';
-	string c;
-	c = "asdasdasd";
-
+	int a;
+	a = 1;
+	char b;
+	b = 'a';
+	test(1, 2);
     return 0;
 }

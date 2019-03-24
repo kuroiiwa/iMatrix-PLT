@@ -47,7 +47,8 @@ let check program =
     in List.fold_left add_bind StringMap.empty [ ("print", Int);
                                ("printb", Bool);
                                ("printf", Float);
-                               ("printbig", Int) ]
+                               ("printbig", Int);
+                               ("printall", Int) ]
   in
 
   (**** Add func to func_symbols with error handler ****)
@@ -66,6 +67,16 @@ let check program =
   let find_func map s = 
     try StringMap.find s map
     with Not_found -> raise (Failure ("unrecognized function " ^ s))
+  in
+
+  let check_dcl (ty, n, d, e) = match e with
+    | Noexpr -> (ty, n, d, e)
+    | Literal _ when ty = Int -> (ty, n, d, e)
+    | Fliteral _ when ty = Float -> (ty, n, d, e)
+    | StrLit _ when ty = String -> (ty, n, d, e)
+    | CharLit _ when ty = Char -> (ty, n, d, e)
+    | BoolLit _ when ty = Bool -> (ty, n, d, e)
+    | _ -> raise (Failure ("Inline declaration with wrong type for " ^ n))
   in
 
   (* Check each function *)
@@ -152,6 +163,7 @@ let check program =
                        string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
                        string_of_typ t2 ^ " in " ^ string_of_expr e))
           in (ty, SBinop((t1, e1'), op, (t2, e2')))
+      | Call("printall", [e]) -> (Void, SCall("printall", [check_expr (var_symbols, func_symbols) e]))
       | Call(fname, args) as call -> 
           let fd = find_func func_symbols fname in
           let param_length = List.length fd.formals in
@@ -175,6 +187,7 @@ let check program =
       in if t' != Bool then raise (Failure err) else (t', e') 
     in
 
+
     (* Return a semantically-checked statement i.e. containing sexprs *)
     let rec check_stmt (var_symbols, func_symbols) = function
         Expr e -> SExpr (check_expr (var_symbols, func_symbols) e)
@@ -193,7 +206,8 @@ let check program =
         SBlock(List.rev lst)
     (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
-      | Dcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SDcl((ty, id, e1, e2)) :: body_sast)
+      | Dcl((ty, id, _, _) as d) -> ignore(check_dcl d);
+      ((StringMap.add id ty var_symbols), func_symbols, SDcl(d) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
@@ -222,8 +236,11 @@ let check program =
     in
     let _ = check_return return_lst in
 
+    let self_var_symbols = ignore(List.map check_dcl funct.formals);
+      List.fold_left (fun m (ty, id, _, _) -> StringMap.add id ty m) var_symbols funct.formals in
+
    (* Check function body line by line while maintaining var and func symbol tables*)
-    let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) funct.body in
+    let (_, _, lst) = List.fold_left check_body_ele (self_var_symbols, func_symbols, []) funct.body in
 
     (* Return SFunc required in SAST *)
     SFunc{
@@ -235,7 +252,8 @@ let check program =
 
 (*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
-    | Globaldcl((ty, id, e1, e2)) -> ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl((ty, id, e1, e2)) :: prog_sast)
+    | Globaldcl((ty, id, _, _) as d) -> ignore(check_dcl d);
+    ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(d) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
     (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
 
