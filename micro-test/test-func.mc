@@ -1,4 +1,4 @@
-void testfunc(int a = 2, int b) {
+void testfunc(int a = 2, int b, mat m(1), img i(1*9%5,2+1,3-1)) {
 	
 }
 

@@ -68,8 +68,10 @@ formals_opt:
 formal_list:
     typ ID                   { [bind_dcl $1 $2 Noexpr]     }
   | typ ID ASSIGN expr       { [bind_dcl $1 $2 $4] }
+  | typ ID LPAREN dimension RPAREN { [bind_mat_img $1 $2 $4] }
   | formal_list COMMA typ ID { (bind_dcl $3 $4 Noexpr) :: $1 }
   | formal_list COMMA typ ID ASSIGN expr { (bind_dcl $3 $4 $6) :: $1 }
+  | formal_list COMMA typ ID LPAREN dimension RPAREN { (bind_mat_img $3 $4 $6) :: $1 }
 
 typ:
     INT   { Int   }
