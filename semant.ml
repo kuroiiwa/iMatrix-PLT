@@ -124,7 +124,7 @@ let check program =
   (**** check if declaration is void type and if expr is legal ****)
   let check_dcl (var_symbols, func_symbols) (ty, n, d, e) =
     match ty with
-      | Void -> raise (Failure ("illegal void " ^ n ^ "var"))
+      | Void -> raise (Failure ("illegal void " ^ n))
       | _ -> ();
     match e with
       | Noexpr -> (ty, n, d, (Void, SNoexpr))
@@ -227,7 +227,7 @@ let check program =
     let _ = List.fold_left check_ret_in_func_body [] funct.body in
 
     let isReturnInFunc a = match !a with
-      | 1 when funct.typ <> Void -> raise(Failure ("no returnin function " ^ funct.fname))
+      | 1 when funct.typ <> Void -> raise(Failure ("no return in function " ^ funct.fname))
       | _ -> ()
     in
     let () = isReturnInFunc ret_absent in

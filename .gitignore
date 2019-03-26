@@ -3,7 +3,6 @@
 
 # Executables
 *.exe
-*.out
 *.app
 
 *.native
