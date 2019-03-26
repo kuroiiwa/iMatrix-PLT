@@ -56,7 +56,7 @@ let translate program =
 
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
-    let global_var m (t, n, _, _ma) = 
+    let global_var m (t, n, _, _) = 
       let init = match t with
           A.Float -> L.const_float (ltype_of_typ t) 0.0
         | A.Int | A.Bool -> L.const_int (ltype_of_typ t) 0

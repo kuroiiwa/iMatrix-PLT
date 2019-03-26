@@ -11,13 +11,86 @@ module StringMap = Map.Make(String)
 
 let check program =
 
-  (* Verify a list of bindings has no void types or duplicate names *)
-  let check_binds (kind : string) (binds : bind list) =
-    let checkVoid kind = function
-      | (Void, b, _, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
-      | _ -> ()
-    in
-    List.iter (checkVoid kind) binds;
+
+(* Raise an exception if the given rvalue type cannot be assigned to
+     the given lvalue type *)
+  let check_assign lvaluet rvaluet err =
+     if lvaluet = rvaluet then lvaluet else raise (Failure err)
+  in   
+
+  (* Return a variable from our current symbol table *)
+  let type_of_identifier map s =
+    try StringMap.find s map
+    with Not_found -> raise (Failure ("undeclared identifier " ^ s))
+  in
+
+  (* Return a function from our symbol table *)
+  let find_func map s = 
+    try StringMap.find s map
+    with Not_found -> raise (Failure ("unrecognized function " ^ s))
+  in
+
+  (**** Check expr including type and function call correctness ****)
+  let rec check_expr (var_symbols, func_symbols) = function
+      Literal  l -> (Int, SLiteral l)
+    | Fliteral l -> (Float, SFliteral l)
+    | StrLit str -> (String, SStrLit str)
+    | CharLit ch -> (Char, SCharLit ch)
+    | BoolLit l  -> (Bool, SBoolLit l)
+    | Noexpr     -> (Void, SNoexpr)
+    | Id s       -> (type_of_identifier var_symbols s, SId s)
+    | Assign(var, e) as ex -> 
+        let lt = type_of_identifier var_symbols var
+        and (rt, e') = check_expr (var_symbols, func_symbols) e in
+        let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+          string_of_typ rt ^ " in " ^ string_of_expr ex
+        in (check_assign lt rt err, SAssign(var, (rt, e')))
+    | Unop(op, e) as ex -> 
+        let (t, e') = check_expr (var_symbols, func_symbols) e in
+        let ty = match op with
+          Neg when t = Int || t = Float -> t
+        | Not when t = Bool -> Bool
+        | _ -> raise (Failure ("illegal unary operator " ^ 
+                               string_of_uop op ^ string_of_typ t ^
+                               " in " ^ string_of_expr ex))
+        in (ty, SUnop(op, (t, e')))
+    | Binop(e1, op, e2) as e -> 
+        let (t1, e1') = check_expr (var_symbols, func_symbols) e1 
+        and (t2, e2') = check_expr (var_symbols, func_symbols) e2 in
+        (* All binary operators require operands of the same type *)
+        let same = t1 = t2 in
+        (* Determine expression type based on operator and operand types *)
+        let ty = match op with
+          Add | Sub | Mult | Div | Mod | Pow when same && t1 = Int   -> Int
+        | Add | Sub | Mult | Div | Pow when same && t1 = Float -> Float
+        | Equal | Neq            when same               -> Bool
+        | Less | Leq | Greater | Geq
+                   when same && (t1 = Int || t1 = Float) -> Bool
+        | And | Or when same && t1 = Bool -> Bool
+        | _ -> raise (
+      Failure ("illegal binary operator " ^
+                     string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
+                     string_of_typ t2 ^ " in " ^ string_of_expr e))
+        in (ty, SBinop((t1, e1'), op, (t2, e2')))
+    | Call("printall", [e]) -> (Void, SCall("printall", [check_expr (var_symbols, func_symbols) e]))
+    | Call(fname, args) as call -> 
+        let fd = find_func func_symbols fname in
+        let param_length = List.length fd.formals in
+        if List.length args != param_length then
+          raise (Failure ("expecting " ^ string_of_int param_length ^ 
+                          " arguments in " ^ string_of_expr call))
+        else let check_call (ft, _, _, _) e = 
+          let (et, e') = check_expr (var_symbols, func_symbols) e in 
+          let err = "illegal argument found " ^ string_of_typ et ^
+            " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
+          in (check_assign ft et err, e')
+        in
+        let args' = List.map2 check_call fd.formals args
+        in (fd.typ, SCall(fname, args'))
+  in
+
+  (**** check dups in bind list auxiliary function ****)
+  let check_binds_dup (kind: string) (binds : bind list) =
     let extName = fun (_, id, _, _) -> id in
     let rec dups = function
         [] -> ()
@@ -27,15 +100,41 @@ let check program =
     in dups (List.sort (fun b1 b2 -> compare (extName b1) (extName b2)) binds)
   in
 
-  (**** Check global variables ****)
-  let pick_binds lst = function
-    | Globaldcl(dcl) -> dcl :: lst
-    | _ -> lst
+  (**** check dups in global scope ****)
+  let check_global_dup (prog : prog_element list) =
+    let pick_binds lst = function
+      | Globaldcl(dcl) -> dcl :: lst
+      | _ -> lst
+    in
+    let binds_list = List.fold_left pick_binds [] prog in
+  check_binds_dup "global" binds_list
   in
-  let binds_list = List.fold_left pick_binds [] program in
-  check_binds "global" binds_list;
 
-  (**** Check functions ****)
+  (**** check dups in one local scope ****)
+  let pick_binds l = function
+      | Dcl(dcl) -> dcl :: l
+      | _ -> l
+  in
+  let check_normal_dup (lst : func_body list) =
+    let binds_list = List.fold_left pick_binds [] lst in
+  check_binds_dup "local" binds_list
+  in
+  check_global_dup program;
+
+  (**** check if declaration is void type and if expr is legal ****)
+  let check_dcl (var_symbols, func_symbols) (ty, n, d, e) =
+    match ty with
+      | Void -> raise (Failure ("illegal void " ^ n ^ "var"))
+      | _ -> ();
+    match e with
+      | Noexpr -> (ty, n, d, (Void, SNoexpr))
+      | _ ->
+    let (rt, e') = check_expr (var_symbols, func_symbols) e in
+    let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^ 
+          string_of_typ rt ^ " in " ^ n ^ " = " ^ string_of_expr e
+      in (check_assign ty rt err, n, d, (rt, e'))
+  in
+
 
   (**** Collect all built-in functions at first ****)
   let built_in_decls = 
@@ -63,122 +162,11 @@ let check program =
        | _ ->  StringMap.add n fd map 
   in
 
-  (* Return a function from our symbol table *)
-  let find_func map s = 
-    try StringMap.find s map
-    with Not_found -> raise (Failure ("unrecognized function " ^ s))
-  in
-
-  let check_dcl (ty, n, d, e) = match e with
-    | Noexpr -> (ty, n, d, e)
-    | Literal _ when ty = Int -> (ty, n, d, e)
-    | Fliteral _ when ty = Float -> (ty, n, d, e)
-    | StrLit _ when ty = String -> (ty, n, d, e)
-    | CharLit _ when ty = Char -> (ty, n, d, e)
-    | BoolLit _ when ty = Bool -> (ty, n, d, e)
-    | _ -> raise (Failure ("Inline declaration with wrong type for " ^ n))
-  in
-
   (* Check each function *)
   let check_function (var_symbols, func_symbols) funct =
-    (* Make sure no formals or locals are void or duplicates *)
-    let rec check_body_binds (kind : string) (binds : func_body list) =
-      let checkVoid kind = function
-        | Dcl(Void, b, _, _) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
-        | Stmt(Block(lst)) -> check_body_binds kind lst
-        | _ -> ()
-      in
-      List.iter (checkVoid kind) binds;
 
-      let rec pick_binds lst = function
-        | Dcl(dcl) -> dcl :: lst
-        | Stmt(Block(fblist)) -> (List.fold_left pick_binds [] fblist) @ lst
-        | _ -> lst
-      in
-      let binds_list = List.fold_left pick_binds [] binds in 
-      let extName = fun (_, id, _, _) -> id in
-      let rec dups = function
-         [] -> ()
-        |  (b1 :: b2 :: _) when (extName b1) = (extName b2) ->
-      raise (Failure ("duplicate " ^ kind ^ " " ^ (extName b1)))
-        | _ :: t -> dups t
-      in dups (List.sort (fun b1 b2 -> compare (extName b1) (extName b2)) binds_list)
-    in
-    check_body_binds "local" funct.body;
-
-    check_binds "formal" funct.formals;
-
-    (* Raise an exception if the given rvalue type cannot be assigned to
-       the given lvalue type *)
-    let check_assign lvaluet rvaluet err =
-       if lvaluet = rvaluet then lvaluet else raise (Failure err)
-    in   
-
-    (* Return a variable from our current symbol table *)
-    let type_of_identifier map s =
-      try StringMap.find s map
-      with Not_found -> raise (Failure ("undeclared identifier " ^ s))
-    in
-
-
-    (**** Check expr including type and function call correctness ****)
-    let rec check_expr (var_symbols, func_symbols) = function
-        Literal  l -> (Int, SLiteral l)
-      | Fliteral l -> (Float, SFliteral l)
-      | StrLit str -> (String, SStrLit str)
-      | CharLit ch -> (Char, SCharLit ch)
-      | BoolLit l  -> (Bool, SBoolLit l)
-      | Noexpr     -> (Void, SNoexpr)
-      | Id s       -> (type_of_identifier var_symbols s, SId s)
-      | Assign(var, e) as ex -> 
-          let lt = type_of_identifier var_symbols var
-          and (rt, e') = check_expr (var_symbols, func_symbols) e in
-          let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
-            string_of_typ rt ^ " in " ^ string_of_expr ex
-          in (check_assign lt rt err, SAssign(var, (rt, e')))
-      | Unop(op, e) as ex -> 
-          let (t, e') = check_expr (var_symbols, func_symbols) e in
-          let ty = match op with
-            Neg when t = Int || t = Float -> t
-          | Not when t = Bool -> Bool
-          | _ -> raise (Failure ("illegal unary operator " ^ 
-                                 string_of_uop op ^ string_of_typ t ^
-                                 " in " ^ string_of_expr ex))
-          in (ty, SUnop(op, (t, e')))
-      | Binop(e1, op, e2) as e -> 
-          let (t1, e1') = check_expr (var_symbols, func_symbols) e1 
-          and (t2, e2') = check_expr (var_symbols, func_symbols) e2 in
-          (* All binary operators require operands of the same type *)
-          let same = t1 = t2 in
-          (* Determine expression type based on operator and operand types *)
-          let ty = match op with
-            Add | Sub | Mult | Div | Mod | Pow when same && t1 = Int   -> Int
-          | Add | Sub | Mult | Div | Pow when same && t1 = Float -> Float
-          | Equal | Neq            when same               -> Bool
-          | Less | Leq | Greater | Geq
-                     when same && (t1 = Int || t1 = Float) -> Bool
-          | And | Or when same && t1 = Bool -> Bool
-          | _ -> raise (
-        Failure ("illegal binary operator " ^
-                       string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
-                       string_of_typ t2 ^ " in " ^ string_of_expr e))
-          in (ty, SBinop((t1, e1'), op, (t2, e2')))
-      | Call("printall", [e]) -> (Void, SCall("printall", [check_expr (var_symbols, func_symbols) e]))
-      | Call(fname, args) as call -> 
-          let fd = find_func func_symbols fname in
-          let param_length = List.length fd.formals in
-          if List.length args != param_length then
-            raise (Failure ("expecting " ^ string_of_int param_length ^ 
-                            " arguments in " ^ string_of_expr call))
-          else let check_call (ft, _, _, _) e = 
-            let (et, e') = check_expr (var_symbols, func_symbols) e in 
-            let err = "illegal argument found " ^ string_of_typ et ^
-              " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
-            in (check_assign ft et err, e')
-          in
-          let args' = List.map2 check_call fd.formals args
-          in (fd.typ, SCall(fname, args'))
-    in
+    let body_dcl = List.fold_left pick_binds [] funct.body in
+    check_binds_dup "local" (funct.formals @ body_dcl);
 
     (**** Check if a expr is bool type ****)
     let check_bool_expr (var_symbols, func_symbols) e = 
@@ -202,41 +190,49 @@ let check program =
         else raise (
     Failure ("return gives " ^ string_of_typ t ^ " expected " ^
        string_of_typ funct.typ ^ " in " ^ string_of_expr e))
-      | Block sl -> let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
+      | Block sl -> ignore(check_normal_dup sl); let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
         SBlock(List.rev lst)
     (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
-      | Dcl((ty, id, _, _) as d) -> ignore(check_dcl d);
-      ((StringMap.add id ty var_symbols), func_symbols, SDcl(d) :: body_sast)
+      | Dcl((ty, id, _, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+      ((StringMap.add id ty var_symbols), func_symbols, SDcl(dcl) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
-    (****      There could be multiple returns ****)
+    (****      There could be multiple returns in different blocks ****)
     (**** Check all return in all statements ****)
     (**** Return could only be absent in void function ****)
-    let rec pick_ret_in_func_body lst = function
-      | Stmt(Return(_) as r_st) -> r_st :: lst
-      | Stmt(Block(stmts)) -> (List.fold_left pick_ret_in_func_body [] stmts) @ lst
-      | Stmt(If(_, b1, b2)) -> (pick_ret_in_stmt b1) @ (pick_ret_in_stmt b2) @ lst
-      | Stmt(For(_, _, _, st)) -> (pick_ret_in_stmt st) @ lst
-      | Stmt(While(_, st)) -> (pick_ret_in_stmt st) @ lst
-      | _ -> lst
-    and pick_ret_in_stmt = function
-      | (Return _) as r_st -> [r_st]
-      | Block(stmts) -> List.fold_left pick_ret_in_func_body [] stmts
-      | If(_, b1, b2) -> (pick_ret_in_stmt b1) @ (pick_ret_in_stmt b2)
-      | For(_, _, _, st) -> pick_ret_in_stmt st
-      | While(_, st) -> pick_ret_in_stmt st
-      | _ -> []
+    (**** nothing should follow return ****)
+    let ret_absent = ref 1 in
+    let followReturn = function
+      | (h :: _) -> (function
+                      | Return _ -> 1
+                      | _ -> 0) h
+      | _ -> 0
     in
-    let return_lst = List.fold_left pick_ret_in_func_body [] funct.body in
-    let check_return = function
-      | [] when funct.typ <> Void -> raise (Failure ("No return in main block of function " ^ funct.fname))
+    let rec check_ret_in_func_body l = function
+      | _ when followReturn l = 1 -> raise(Failure ("nothing may follow a return in function " ^ funct.fname))
+      | Stmt(Return _ as s) -> ret_absent := 0; s :: l
+      | Stmt(Block sl ) -> List.fold_left check_ret_in_func_body [] sl
+      | Stmt(If(_, b1, b2))  -> check_ret_in_stmt b1; check_ret_in_stmt b2; l
+      | Stmt(While(_, st))  -> check_ret_in_stmt st; l
+      | Stmt(For(_, _, _, st))  -> check_ret_in_stmt st; l
+      | _ -> l
+    and check_ret_in_stmt = function
+      | Return _ -> ret_absent := 0; ()
+      | Block(stmts) -> ignore(List.fold_left check_ret_in_func_body [] stmts); ()
       | _ -> ()
     in
-    let _ = check_return return_lst in
 
-    let self_var_symbols = ignore(List.map check_dcl funct.formals);
+    let _ = List.fold_left check_ret_in_func_body [] funct.body in
+
+    let isReturnInFunc a = match !a with
+      | 1 when funct.typ <> Void -> raise(Failure ("no returnin function " ^ funct.fname))
+      | _ -> ()
+    in
+    let () = isReturnInFunc ret_absent in
+
+    let self_var_symbols =
       List.fold_left (fun m (ty, id, _, _) -> StringMap.add id ty m) var_symbols funct.formals in
 
    (* Check function body line by line while maintaining var and func symbol tables*)
@@ -246,14 +242,14 @@ let check program =
     SFunc{
       styp = funct.typ;
       sfname = funct.fname;
-      sformals = funct.formals;
+      sformals = List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d in dcl :: l) [] funct.formals;
       sbody = List.rev lst }
   in
 
 (*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
-    | Globaldcl((ty, id, _, _) as d) -> ignore(check_dcl d);
-    ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(d) :: prog_sast)
+    | Globaldcl((ty, id, _, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+    ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
     (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
 

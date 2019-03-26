@@ -16,6 +16,8 @@ and sx =
   | SCall of string * sexpr list
   | SNoexpr
 
+type sbind =  typ * string * dim * sexpr
+
 type sstmt =
     SBlock of sbody list
   | SExpr of sexpr
@@ -24,16 +26,16 @@ type sstmt =
   | SFor of sexpr * sexpr * sexpr * sstmt
   | SWhile of sexpr * sstmt
 and sbody = SStmt of sstmt
-           | SDcl of bind
+           | SDcl of sbind
 
 type sfunc_decl = {
     styp : typ;
     sfname : string;
-    sformals : bind list;
+    sformals : sbind list;
     sbody : sbody list;
   }
 
-type sprog_element = SGlobaldcl of bind
+type sprog_element = SGlobaldcl of sbind
                   | SFunc of sfunc_decl
 
 type sprogram = sprog_element list
@@ -56,7 +58,11 @@ let rec string_of_sexpr (t, e) =
   | SCall(f, el) ->
       f ^ "(" ^ String.concat ", " (List.map string_of_sexpr el) ^ ")"
   | SNoexpr -> ""
-          ) ^ ")"            
+          ) ^ ")"      
+
+let string_of_svdecl (t, id, _, e) = match e with
+  | (_ ,SNoexpr) -> string_of_typ t ^ " " ^ id ^ ";\n"
+  | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_sexpr e ^";\n"
 
 let rec string_of_sstmt = function
     SBlock(stmts) ->
@@ -73,20 +79,23 @@ let rec string_of_sstmt = function
   | SWhile(e, s) -> "while (" ^ string_of_sexpr e ^ ") " ^ string_of_sstmt s
 and
  string_of_sbody = function
-  | SDcl(d) -> string_of_vdecl d
+  | SDcl(d) -> string_of_svdecl d
   | SStmt(st) -> string_of_sstmt st
 
+let string_of_sformals (t, id, _, e) = match e with
+  | (_ ,SNoexpr) -> string_of_typ t ^ " " ^ id
+  | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_sexpr e
 
 let string_of_sfdecl fdecl =
   string_of_typ fdecl.styp ^ " " ^
-  fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.sformals) ^
+  fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_sformals fdecl.sformals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"
 
 let string_of_sprogram lst =
   let helper str = function
-    | SGlobaldcl(dcl) -> str ^ string_of_vdecl dcl
+    | SGlobaldcl(dcl) -> str ^ string_of_svdecl dcl
     | SFunc(f) -> str ^ string_of_sfdecl f
   in
   List.fold_left helper "" lst
