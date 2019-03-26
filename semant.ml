@@ -20,7 +20,7 @@ let check program =
     List.iter (checkVoid kind) binds;
     let extName = function
       | CommonBind(_, id, _, _) -> id 
-      | MatBind(_, id, _) -> id 
+      | MatBind(_, id, _, _) -> id 
       | ImgBind(_, id, _) -> id in
     let rec dups = function
         [] -> ()
@@ -92,7 +92,7 @@ let check program =
       let binds_list = List.fold_left pick_binds [] binds in 
       let extName = function
         | CommonBind(_, id, _, _) -> id 
-        | MatBind(_, id, _) -> id 
+        | MatBind(_, id, _, _) -> id 
         | ImgBind(_, id, _) -> id in
       let rec dups = function
          [] -> ()
@@ -173,7 +173,7 @@ let check program =
               let err = "illegal argument found " ^ string_of_typ et ^
                 " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
               in (check_assign ft et err, e')
-            | MatBind(t, _, _) -> (t, e')
+            | MatBind(t, _, _, _) -> (t, e')
             | ImgBind(t, _, _) -> (t, e')
           in
           let args' = List.map2 check_call fd.formals args
@@ -209,8 +209,8 @@ let check program =
       | Dcl(dcl) -> match dcl with
         | CommonBind((ty, id, e1, e2)) ->
           ((StringMap.add id ty var_symbols), func_symbols, SDcl(CommonBind(ty, id, e1, e2)) :: body_sast)
-        | MatBind((ty, id, d)) ->
-          ((StringMap.add id ty var_symbols), func_symbols, SDcl(MatBind(ty, id, d)) :: body_sast)
+        | MatBind((ty, id, d, matval)) ->
+          ((StringMap.add id ty var_symbols), func_symbols, SDcl(MatBind(ty, id, d, matval)) :: body_sast)
         | ImgBind((ty, id, d)) ->
           ((StringMap.add id ty var_symbols), func_symbols, SDcl(ImgBind(ty, id, d)) :: body_sast)
     in
@@ -258,8 +258,8 @@ let check program =
     | Globaldcl(dcl) -> match dcl with
       | CommonBind(ty, id, e1, e2) -> 
         ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(CommonBind(ty, id, e1, e2)) :: prog_sast)
-      | MatBind(ty, id, d) -> 
-        ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(MatBind(ty, id, d)) :: prog_sast)
+      | MatBind(ty, id, d, matval) -> 
+        ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(MatBind(ty, id, d, matval)) :: prog_sast)
       | ImgBind(ty, id, d) -> 
         ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(ImgBind(ty, id, d)) :: prog_sast)
 

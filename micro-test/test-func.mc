@@ -11,7 +11,15 @@ int main() {
 	a = 't';
 	a = '"';
 	string c = "abc";
-	mat m(1,2,3);
+	mat m1(1,3);
+	m1 = [[[1,2,3]];
+	mat m2(3,2,1);
+	mat m3(4);
+	mat m4 = [1];
+	mat m5 = [[[1],[2]], [[3],[4]]];
+	mat m6 = [[1],[2]];
+	//mat m7 = [[1],[2,3]];
+	
 	img i(2+4,6*1);
 	c = "asdasdasd";
 

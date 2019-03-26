@@ -10,6 +10,7 @@ type typ = Int | Bool | Float | Char | String | Mat | Img | Void
 type expr =
     Literal of int
   | Fliteral of string
+  | Matval of expr list list list
   | BoolLit of bool
   | StrLit of string
   | CharLit of char
@@ -18,6 +19,7 @@ type expr =
  (* | Getattr of string * string *)
   | Unop of uop * expr
   | Assign of string * expr
+  | Matassign of string * expr list list list
   | Call of string * expr list
   | Noexpr
 
@@ -25,7 +27,7 @@ type dim = int * int * int
 type dim_expr = expr * expr * expr
 
 type bind =  CommonBind of typ * string * dim * expr
-            | MatBind of typ * string * dim_expr
+            | MatBind of typ * string * dim_expr * (expr list list list)
             | ImgBind of typ * string * dim_expr
 
 
@@ -85,6 +87,8 @@ let string_of_uop = function
 let rec string_of_expr = function
     Literal(l) -> string_of_int l
   | Fliteral(l) -> l
+  | Matval(m) -> 
+    string_of_mat m
   | StrLit(l) -> l
   | CharLit(c) -> String.make 1 c
   | BoolLit(true) -> "true"
@@ -99,6 +103,10 @@ let rec string_of_expr = function
   | Call(f, el) ->
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Noexpr -> ""
+and
+ string_of_1dmat = function mat1d -> "[" ^ (String.concat ", " (List.map string_of_expr mat1d)) ^ "]" and
+ string_of_2dmat = function mat2d -> "[" ^ String.concat ", " (List.map string_of_1dmat mat2d) ^ "]" and
+ string_of_mat = function mat3d -> "[" ^ String.concat ", " (List.map string_of_2dmat mat3d) ^ "]" 
 
 let string_of_typ = function
     Int -> "int"
@@ -112,10 +120,11 @@ let string_of_typ = function
 
 let string_of_vdecl bind_expr = 
   match bind_expr with 
-    MatBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+    MatBind(t, id, dim_expr, matval) -> string_of_typ t ^ " " ^ id ^ 
         "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
         string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
-        string_of_expr (trd3tuple dim_expr) ^ ");\n"
+        string_of_expr (trd3tuple dim_expr) ^ ")" ^
+        string_of_mat matval ^"\n"
   | ImgBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
         "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
         string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
@@ -145,10 +154,11 @@ and
 let string_of_formals = function
     | CommonBind(ty, y, _, Noexpr) -> string_of_typ ty ^ " " ^ y
     | CommonBind(ty, y, _, expr) -> string_of_typ ty ^ " " ^ y ^ " = " ^ string_of_expr expr
-    | MatBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
+    | MatBind(t, id, dim_expr, matval) -> string_of_typ t ^ " " ^ id ^ 
         "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
         string_of_expr (snd3tuple dim_expr) ^ ", " ^ 
-        string_of_expr (trd3tuple dim_expr) ^ ")"
+        string_of_expr (trd3tuple dim_expr) ^ ")=" ^
+        string_of_mat matval
     | ImgBind(t, id, dim_expr) -> string_of_typ t ^ " " ^ id ^ 
         "(" ^ string_of_expr (fst3tuple dim_expr) ^ ", " ^
         string_of_expr (snd3tuple dim_expr) ^ ", " ^ 

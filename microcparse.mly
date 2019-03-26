@@ -7,14 +7,49 @@ let bind_dcl = fun data_type variable_name expr -> CommonBind(data_type, variabl
 let bind_mat_img = let fst3tuple = function (fst, _, _) -> fst in
                    let snd3tuple = function (_, snd, _) -> snd in 
                    let trd3tuple = function (_, _, trd) -> trd in
+                   (* let build_zero_mat dim = 
+                    let rec build_1d times ls = 
+                      if times =ls @ [0] @ *)  
                    fun data_type variable_name dimension -> 
                     match data_type with 
-                    | Mat -> MatBind(data_type, variable_name, (fst3tuple dimension, snd3tuple dimension, trd3tuple dimension))
+                    | Mat -> 
+                      let dim = (fst3tuple dimension, snd3tuple dimension, trd3tuple dimension) in
+                      MatBind(data_type, variable_name, dim, [[[]]])
                     | Img -> ImgBind(data_type, variable_name, (fst3tuple dimension, snd3tuple dimension, trd3tuple dimension))
                     | _ -> raise (Failure("Given type does not match MAT / IMG"))
+
+let bind_mat_val idname matval = 
+  let get_len mat_nd = if (List.length mat_nd) <> 1 then List.length mat_nd else -1  in
+  (* check if dimensions are same *)
+  let get_child_elements mat_nd = 
+    List.fold_left (fun x y -> x @ y) [] mat_nd in
+
+  let rec check_equal array fst_dim = 
+    if List.length array > 1 then 
+      if List.length (List.hd array) = fst_dim then check_equal (List.tl array) fst_dim
+      else raise(Failure("dimension check failure"))
+    else 
+      if List.length (List.hd array) = fst_dim then ()
+      else raise(Failure("dimension check failure")) in
+
+  let get_dim mat_3d = 
+    check_equal mat_3d (List.length (List.hd mat_3d));
+    let dim3 = get_len mat_3d in  
+    let array_2d = mat_3d in
+    (* print_2d_list array_2d; *)
+    check_equal array_2d (List.length (List.hd array_2d));
+    let dim2 = get_len (List.hd array_2d) in
+    let array_1d = get_child_elements array_2d in
+    (* print_1d_list (List.hd array_1d); *)
+    check_equal array_1d (List.length (List.hd array_1d));
+    let dim1 = get_len (List.hd array_1d) in
+    (Literal(dim3), Literal(dim2), Literal(dim1)) in
+  
+  MatBind(Mat, idname, get_dim matval, matval)
 %}
 
-%token LPAREN RPAREN /* LBRACK RBRACK */ LBRACE RBRACE
+
+%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token SEMI COMMA DOT
 %token PLUS MINUS TIMES DIVIDE MODULO POWER /*SELFPLUS SELFMINUS*/ /* MATMUL  */
 %token ASSIGN
@@ -92,6 +127,7 @@ vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
   | typ ID LPAREN dimension RPAREN SEMI {bind_mat_img $1 $2 $4}
+  | typ ID ASSIGN mat_val SEMI  { bind_mat_val $2 $4 }
 
 dimension:
     expr                          { (Literal(-1), Literal(-1), $1) }
@@ -142,6 +178,7 @@ expr:
   | MINUS expr %prec NOT { Unop(Neg, $2)      }
   | NOT expr         { Unop(Not, $2)          }
   | ID ASSIGN expr   { Assign($1, $3)         }
+  | ID ASSIGN mat_val  { Matassign($1, $3) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
 
@@ -152,3 +189,30 @@ args_opt:
 args_list:
     expr                    { [$1] }
   | args_list COMMA expr { $3 :: $1 }
+
+mat_val:
+    /* nothing */ { [[[]]] } 
+  | mat_1d        { [[$1]] }
+  | mat_2d        { [$1] }
+  | mat_3d        { $1 }
+
+mat_3d:
+  mat_3d_start RBRACK { List.rev $1 }
+
+mat_3d_start:
+    LBRACK mat_2d       { [$2] }
+  | mat_3d_start COMMA mat_2d { $3 :: $1 }
+
+mat_2d:
+  mat_2d_start RBRACK { List.rev $1 }
+
+mat_2d_start:
+    LBRACK mat_1d       { [$2] }
+  | mat_2d_start COMMA mat_1d { $3 :: $1 }
+
+mat_1d:
+  mat_1d_start RBRACK { List.rev $1 }
+
+mat_1d_start:
+    LBRACK expr               { [$2] }
+  | mat_1d_start COMMA expr   { $3 :: $1 }
