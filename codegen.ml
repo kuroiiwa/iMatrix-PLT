@@ -323,11 +323,10 @@ let translate program =
     and add_local (local_vars , builder) (t, n, _, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in
-      let e' = expr_val local_vars e in
       let () = match tmp with
         | SNoexpr -> ()
         | SStrLit str -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
-        | _ -> ignore(L.build_store e' local_var builder); ()
+        | _ -> let e' = expr_val local_vars e in ignore(L.build_store e' local_var builder); ()
       in
       (StringMap.add n local_var local_vars, builder)
 
