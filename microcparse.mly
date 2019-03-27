@@ -45,6 +45,14 @@ decls:
    /* nothing */ { []              }
  | decls vdecl { Globaldcl($2) :: $1 }
  | decls fdecl { Func($2) :: $1 }
+ | decls fdecl_bodyless { Func_dcl($2) :: $1 }
+
+fdecl_bodyless:
+  typ ID LPAREN formals_opt RPAREN SEMI
+     { { typ = $1;
+   fname = $2;
+   formals = List.rev $4;
+   body = [] }}
 
 fdecl:
    typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE

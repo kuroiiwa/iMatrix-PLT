@@ -46,6 +46,7 @@ type func_decl = {
 
 type prog_element = Globaldcl of bind
                   | Func of func_decl
+                  | Func_dcl of func_decl
 
 type program = prog_element list
 
@@ -136,5 +137,6 @@ let string_of_program lst =
   let helper str = function
   | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
   | Func(f) -> str ^ string_of_fdecl f
+  | Func_dcl(f) -> str ^ string_of_fdecl f
   in
   List.fold_left helper "" lst

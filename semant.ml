@@ -156,9 +156,13 @@ let check program =
     and dup_err = "duplicate function " ^ fd.fname
     and make_err er = raise (Failure er)
     and n = fd.fname
+    in
+    let res = StringMap.mem n map
     in match fd with
          _ when StringMap.mem n built_in_decls -> make_err built_in_err
-       | _ when StringMap.mem n map -> make_err dup_err  
+       | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd map 
+       | _ when res && (let f = StringMap.find n map in (f.body <> [] && fd.body <> [])) -> make_err dup_err
+(*        | _ when StringMap.mem n map -> make_err dup_err   *)
        | _ ->  StringMap.add n fd map 
   in
 
@@ -252,6 +256,8 @@ let check program =
     ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
     (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
+    | Func_dcl(f) -> let new_func_symbols = add_func func_symbols f in
+    (var_symbols, new_func_symbols, prog_sast)
 
   in
 
