@@ -2,15 +2,16 @@
 iMatrix, a language trying to make programming less painful for matrix and image processing.
 
 ---
-
+## Test
+Run ```./test.sh ```
 ## Progress
 Arbitrary position for global declarations, function declarations, local declarations and local statements.  
-~~Syntactically allow inline initialization. Now inline initialization supports expression. (**TODO** codegen not finished)~~
+~~Syntactically allow inline initialization. Now inline initialization supports expression. (**TODO** codegen not finished)~~  
 Allow inline initialization except for ASSIGN and FUNCTION CALL. (**TODO** expand functionality)  
-Formals in function has no default initialization yet.  (**TODO** define default semantics and codegen)
+~~Formals in function has no default initialization yet.  (**TODO** define default semantics and codegen)~~  
 Possible bugs in AST, semantic check. (**TODO** need more test)  
 Codegen finished. (**TODO** need more test)
-Return check will make sure there is at least one return in function and nothing follows return.
+Return check will make sure there is at least one return in non-void function and nothing follows return.
 
 ## Semantic check list
 * Check global binds has no dups
