@@ -24,8 +24,8 @@ rule token = parse
 | '/'      { DIVIDE }
 | '%'      { MODULO }
 | '^'      { POWER }
-(* | "++"     { SELFPLUS } *)
-(* | "--"     { SELFMINUS } *)
+| "++"     { SELFPLUS }
+| "--"     { SELFMINUS }
 (*| "*."     { MATMUL } *)
 | '='      { ASSIGN }                   (* assign *)
 | "=="     { EQ }                       (* logical *)

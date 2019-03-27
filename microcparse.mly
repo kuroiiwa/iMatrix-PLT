@@ -8,7 +8,7 @@ let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-
 
 %token LPAREN RPAREN /* LBRACK RBRACK */ LBRACE RBRACE
 %token SEMI COMMA DOT
-%token PLUS MINUS TIMES DIVIDE MODULO POWER /*SELFPLUS SELFMINUS*/ /* MATMUL  */
+%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS /* MATMUL  */
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
 %token IF ELSE FOR WHILE /* BREAK CONTINUE */ RETURN
@@ -114,8 +114,8 @@ expr:
   | expr DIVIDE expr { Binop($1, Div,   $3)   }
   | expr MODULO expr { Binop($1, Mod,   $3)   }
   | expr POWER  expr { Binop($1, Pow,   $3)   }
-  /* | SELFPLUS expr     { Binop($2, Selfplus)} */
-  /* | SELFMINUS expr    { Binop($2, Selfminus)} */
+  | SELFPLUS ID      { Assign($2, Binop(Id($2), Add, Literal(1))) }
+  | SELFMINUS ID     { Assign($2, Binop(Id($2), Sub, Literal(1))) }
   /* | expr MATMUL expr { Binop($1, Matmul,   $3)   } */
   | expr EQ     expr { Binop($1, Equal, $3)   }
   | expr NEQ    expr { Binop($1, Neq,   $3)   }
