@@ -45,40 +45,6 @@ let translate program =
     | A.String -> string_t
   in
 
-
-  let pick_global_dcl lst = function
-    | SGlobaldcl(dcl) -> dcl :: lst
-    | _ -> lst
-  in
-  let globals = List.fold_left pick_global_dcl [] program in
-
-  let null_t = L.define_global "_null" (L.const_stringz context "") the_module in 
-
-  (* Create a map of global variables after creating each *)
-  let global_vars : L.llvalue StringMap.t =
-    let global_var m (t, n, _, _) = 
-      let init = match t with
-          A.Float -> L.const_float (ltype_of_typ t) 0.0
-        | A.Int | A.Bool -> L.const_int (ltype_of_typ t) 0
-        | A.Char -> L.const_int (ltype_of_typ t) 0
-        | A.String -> L.const_bitcast null_t string_t
-        | _ -> L.const_int (ltype_of_typ t) 0
-      in 
-      StringMap.add n (L.define_global n init the_module) m 
-    in
-    List.fold_left global_var StringMap.empty globals in
-
-  let printf_t : L.lltype = 
-      L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
-  let printf_func : L.llvalue = 
-      L.declare_function "printf" printf_t the_module in
-
-  let printbig_t : L.lltype =
-      L.function_type i32_t [| i32_t |] in
-  let printbig_func : L.llvalue =
-      L.declare_function "printbig" printbig_t the_module in
-
-
   let pick_func lst = function
     | SFunc(func) -> func :: lst
     | _ -> lst
@@ -95,6 +61,104 @@ let translate program =
       in let ftype = L.function_type (ltype_of_typ fdecl.styp) formal_types in
       StringMap.add name (L.define_function name ftype the_module, fdecl) m in
     List.fold_left function_decl StringMap.empty functions in
+
+  (* this lookup function is only for global declarations*)
+  let lookup_global m n = try StringMap.find n m
+                 with Not_found -> raise(Failure ("internal error: global var/func should have been defined"))
+  in
+
+  (* return llvalue for a expr for inline init (function call and assign not supported)*)
+  let rec expr_val g_vars ((_, e) : sexpr) = match e with
+        SLiteral i  -> L.const_int i32_t i
+      | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
+      | SFliteral l -> L.const_float_of_string float_t l
+      | SCharLit ch -> L.const_int i8_t (Char.code ch)
+      | SStrLit str -> L.define_global str (L.const_stringz context str) the_module 
+      | SNoexpr     -> L.const_int i32_t 0
+      | SId s       -> lookup_global g_vars s
+      | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
+      | SBinop ((A.Float,_ ) as e1, op, e2) ->
+    let e1' = expr_val g_vars e1
+    and e2' = expr_val g_vars e2 in
+    (match op with 
+      A.Add     -> L.const_fadd 
+    | A.Sub     -> L.const_fsub
+    | A.Mult    -> L.const_fmul
+    | A.Div     -> L.const_fdiv 
+    | A.Equal   -> L.const_fcmp L.Fcmp.Oeq
+    | A.Neq     -> L.const_fcmp L.Fcmp.One
+    | A.Less    -> L.const_fcmp L.Fcmp.Olt
+    | A.Leq     -> L.const_fcmp L.Fcmp.Ole
+    | A.Greater -> L.const_fcmp L.Fcmp.Ogt
+    | A.Geq     -> L.const_fcmp L.Fcmp.Oge
+    | A.And | A.Or | A.Mod | A.Pow ->
+        raise (Failure "internal error: semant should have rejected and/or on float")
+    ) e1' e2'
+      | SBinop (e1, op, e2) ->
+    let e1' = expr_val g_vars e1
+    and e2' = expr_val g_vars e2 in
+    (match op with
+      A.Add     -> L.const_add
+    | A.Sub     -> L.const_sub
+    | A.Mult    -> L.const_mul
+    | A.Div     -> L.const_sdiv
+    | A.Mod     -> L.const_srem
+    | A.And     -> L.const_and
+    | A.Or      -> L.const_or
+    | A.Equal   -> L.const_icmp L.Icmp.Eq
+    | A.Neq     -> L.const_icmp L.Icmp.Ne
+    | A.Less    -> L.const_icmp L.Icmp.Slt
+    | A.Leq     -> L.const_icmp L.Icmp.Sle
+    | A.Greater -> L.const_icmp L.Icmp.Sgt
+    | A.Geq     -> L.const_icmp L.Icmp.Sge
+    | A.Pow     ->  raise (Failure "internal error: Power for int not supported yet")
+    ) e1' e2'
+      | SUnop(op, ((t, _) as e)) ->
+          let e' = expr_val g_vars e in
+    (match op with
+      A.Neg when t = A.Float -> L.const_fneg 
+    | A.Neg                  -> L.const_neg
+    | A.Not                  -> L.const_not) e'
+      | SCall (_, _) -> raise(Failure ("internal error:function call should be rejected by semantic check"))
+  in
+
+
+  let pick_global_dcl lst = function
+    | SGlobaldcl(dcl) -> dcl :: lst
+    | _ -> lst
+  in
+  let globals = List.rev (List.fold_left pick_global_dcl [] program) in
+
+  let null_t = L.define_global "__null" (L.const_stringz context "") the_module in 
+
+  (* Create a map of global variables after creating each *)
+  let global_vars : L.llvalue StringMap.t =
+    let global_var m (t, n, _, e) =
+      let (_, tmp) = e in
+      let e' = expr_val m e in
+      let init = match tmp,t with
+          SNoexpr,A.Float -> L.const_float (ltype_of_typ t) 0.0
+        | SNoexpr,A.Int | SNoexpr,A.Bool -> L.const_int (ltype_of_typ t) 0
+        | SNoexpr,A.Char -> L.const_int (ltype_of_typ t) 0
+        | SNoexpr,A.String -> L.const_bitcast null_t string_t
+        | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
+        | _,A.String -> L.const_bitcast e' string_t
+        | _,_ -> e'
+      in 
+      StringMap.add n (L.define_global n init the_module) m 
+    in
+    List.fold_left global_var StringMap.empty globals in
+
+  let printf_t : L.lltype = 
+      L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
+  let printf_func : L.llvalue = 
+      L.declare_function "printf" printf_t the_module in
+
+  let printbig_t : L.lltype =
+      L.function_type i32_t [| i32_t |] in
+  let printbig_func : L.llvalue =
+      L.declare_function "printbig" printbig_t the_module in
+
   
  (* Fill in the body of the given function *)
   let build_function_body fdecl =
@@ -126,8 +190,6 @@ let translate program =
     in
 
 
-(* Return the value for a variable or formal argument.
-       Check local names first, then global names *)
     let lookup m n = try StringMap.find n m
                    with Not_found -> StringMap.find n global_vars
     in
@@ -151,14 +213,13 @@ let translate program =
     | A.Sub     -> L.build_fsub
     | A.Mult    -> L.build_fmul
     | A.Div     -> L.build_fdiv 
-    | A.Pow     -> L.build_fmul
     | A.Equal   -> L.build_fcmp L.Fcmp.Oeq
     | A.Neq     -> L.build_fcmp L.Fcmp.One
     | A.Less    -> L.build_fcmp L.Fcmp.Olt
     | A.Leq     -> L.build_fcmp L.Fcmp.Ole
     | A.Greater -> L.build_fcmp L.Fcmp.Ogt
     | A.Geq     -> L.build_fcmp L.Fcmp.Oge
-    | A.And | A.Or | A.Mod ->
+    | A.And | A.Or | A.Mod | A.Pow->
         raise (Failure "internal error: semant should have rejected and/or on float")
     ) e1' e2' "tmp" builder
       | SBinop (e1, op, e2) ->
@@ -186,17 +247,11 @@ let translate program =
       A.Neg when t = A.Float -> L.build_fneg 
     | A.Neg                  -> L.build_neg
     | A.Not                  -> L.build_not) e' "tmp" builder
-      | SCall ("printall", [e]) ->
+      | SCall ("print", [e]) ->
         L.build_call printf_func [| ty_to_format e ; (expr (local_vars, builder) e) |]
         "printf" builder
-      | SCall ("print", [e]) | SCall ("printb", [e]) ->
-    L.build_call printf_func [| int_format_str ; (expr (local_vars, builder) e) |]
-      "printf" builder
       | SCall ("printbig", [e]) ->
     L.build_call printbig_func [| (expr (local_vars, builder) e) |] "printbig" builder
-      | SCall ("printf", [e]) -> 
-    L.build_call printf_func [| float_format_str ; (expr (local_vars, builder) e) |]
-      "printf" builder
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
    let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in
@@ -205,7 +260,6 @@ let translate program =
                       | _ -> f ^ "_result") in
          L.build_call fdef (Array.of_list llargs) result builder
     in
-
 
 
     (* LLVM insists each basic block end with exactly one "terminator" 
@@ -266,8 +320,15 @@ let translate program =
       ( SBlock [SStmt(SExpr e1) ; SStmt(SWhile (e2, SBlock [SStmt(body) ; SStmt(SExpr e3)])) ] )
 
 
-    and add_local (local_vars , builder) (t, n, _, _) =
+    and add_local (local_vars , builder) (t, n, _, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
+      let (_, tmp) = e in
+      let e' = expr_val local_vars e in
+      let () = match tmp with
+        | SNoexpr -> ()
+        | SStrLit str -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
+        | _ -> ignore(L.build_store e' local_var builder); ()
+      in
       (StringMap.add n local_var local_vars, builder)
 
     and build_stmt (local_vars, builder) = function

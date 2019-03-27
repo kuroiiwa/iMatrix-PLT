@@ -72,7 +72,7 @@ let check program =
                      string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
         in (ty, SBinop((t1, e1'), op, (t2, e2')))
-    | Call("printall", [e]) -> (Void, SCall("printall", [check_expr (var_symbols, func_symbols) e]))
+    | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in
@@ -123,8 +123,10 @@ let check program =
 
   (**** check if declaration is void type and if expr is legal ****)
   let check_dcl (var_symbols, func_symbols) (ty, n, d, e) =
-    match ty with
-      | Void -> raise (Failure ("illegal void " ^ n))
+    match ty,e with
+      | Void,_ -> raise(Failure ("illegal void " ^ n))
+      | _,Assign _ -> raise(Failure ("assign in init not supported"))
+      | _,Call _ -> raise(Failure ("calling funciton in init not supported"))
       | _ -> ();
     match e with
       | Noexpr -> (ty, n, d, (Void, SNoexpr))
@@ -143,11 +145,9 @@ let check program =
       fname = name; 
       formals = [(ty, "x", (-1,-1,-1), Noexpr)];
       body = [] } map
-    in List.fold_left add_bind StringMap.empty [ ("print", Int);
-                               ("printb", Bool);
-                               ("printf", Float);
+    in List.fold_left add_bind StringMap.empty [
                                ("printbig", Int);
-                               ("printall", Int) ]
+                               ("print", Int) ]
   in
 
   (**** Add func to func_symbols with error handler ****)
