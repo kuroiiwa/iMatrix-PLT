@@ -242,7 +242,7 @@ let check program =
     SFunc{
       styp = funct.typ;
       sfname = funct.fname;
-      sformals = List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d in dcl :: l) [] funct.formals;
+      sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d in dcl :: l) [] funct.formals);
       sbody = List.rev lst }
   in
 

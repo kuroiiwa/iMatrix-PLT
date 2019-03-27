@@ -82,13 +82,9 @@ and
   | SDcl(d) -> string_of_svdecl d
   | SStmt(st) -> string_of_sstmt st
 
-let string_of_sformals (t, id, _, e) = match e with
-  | (_ ,SNoexpr) -> string_of_typ t ^ " " ^ id
-  | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_sexpr e
-
 let string_of_sfdecl fdecl =
   string_of_typ fdecl.styp ^ " " ^
-  fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_sformals fdecl.sformals) ^
+  fdecl.sfname ^ "(" ^ String.concat ", " (List.map (fun (t, id, _, _) -> string_of_typ t ^ " " ^ id) fdecl.sformals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"

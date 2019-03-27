@@ -124,13 +124,9 @@ and
   | Dcl(d) -> string_of_vdecl d
   | Stmt(st) -> string_of_stmt st
 
-let string_of_formals = function
-    | (ty, y, _, Noexpr) -> string_of_typ ty ^ " " ^ y
-    | (ty, y, _, e) -> string_of_typ ty ^ " " ^ y ^ " = " ^ string_of_expr e
-
 let string_of_fdecl fdecl =
   string_of_typ fdecl.typ ^ " " ^
-  fdecl.fname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.formals) ^
+  fdecl.fname ^ "(" ^ String.concat ", " (List.map (fun (ty, y, _, _) -> string_of_typ ty ^ " " ^ y) fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_func_body fdecl.body) ^
   "}\n"
