@@ -129,7 +129,7 @@ let translate program =
   in
   let globals = List.rev (List.fold_left pick_global_dcl [] program) in
 
-  let null_t = L.define_global "__null" (L.const_stringz context "") the_module in 
+(*   let null_t = L.define_global "__null" (L.const_stringz context "") the_module in  *)
 
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
@@ -140,7 +140,7 @@ let translate program =
           SNoexpr,A.Float -> L.const_float (ltype_of_typ t) 0.0
         | SNoexpr,A.Int | SNoexpr,A.Bool -> L.const_int (ltype_of_typ t) 0
         | SNoexpr,A.Char -> L.const_int (ltype_of_typ t) 0
-        | SNoexpr,A.String -> L.const_bitcast null_t string_t
+        | SNoexpr,A.String -> L.const_pointer_null string_t
         | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
         | _,A.String -> L.const_bitcast e' string_t
         | _,_ -> e'
@@ -159,24 +159,29 @@ let translate program =
   let printbig_func : L.llvalue =
       L.declare_function "printbig" printbig_t the_module in
 
+
+  let int_format_str = L.const_bitcast 
+  (L.define_global "fmt" (L.const_stringz context "%d\n") the_module) string_t
+  and float_format_str = L.const_bitcast 
+  (L.define_global "fmt" (L.const_stringz context "%g\n") the_module) string_t
+  and char_format_str = L.const_bitcast 
+  (L.define_global "fmt" (L.const_stringz context "%c\n") the_module) string_t
+  and string_format_str = L.const_bitcast 
+  (L.define_global "fmt" (L.const_stringz context "%s\n") the_module) string_t
+  in
+
+  let ty_to_format (ty, _) = match ty with
+    | A.Int | A.Bool -> int_format_str
+    | A.Float -> float_format_str
+    | A.Char -> char_format_str
+    | A.String -> string_format_str
+    | _ -> int_format_str (* Should be rejected before *)
+  in
   
  (* Fill in the body of the given function *)
   let build_function_body fdecl =
     let (the_function, _) = StringMap.find fdecl.sfname function_decls in
     let builder = L.builder_at_end context (L.entry_block the_function) in
-
-    let int_format_str = L.build_global_stringptr "%d\n" "fmt" builder
-    and float_format_str = L.build_global_stringptr "%g\n" "fmt" builder 
-    and char_format_str = L.build_global_stringptr "%c\n" "fmt" builder 
-    and string_format_str = L.build_global_stringptr "%s\n" "fmt" builder in
-
-    let ty_to_format (ty, _) = match ty with
-      | A.Int | A.Bool -> int_format_str
-      | A.Float -> float_format_str
-      | A.Char -> char_format_str
-      | A.String -> string_format_str
-      | _ -> int_format_str (* Should be rejected before *)
-    in
 
     let formal_vars : L.llvalue StringMap.t =
       let add_formal m (t, n, _, _) p =
