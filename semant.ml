@@ -320,4 +320,3 @@ let check program =
   let _ = find_func f "main" in (* Ensure "main" is defined *)
 
   List.rev lst
-

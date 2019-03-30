@@ -5,7 +5,7 @@ type op = Add | Sub | Mult | Div | Mod | Pow | Selfplus | Selfminus| Equal | Neq
 
 type uop = Neg | Not
 
-type typ = Int | Bool | Float | Char | String | Void
+type typ = Int | Bool | Float | Char | String | Void | Mat | Img
 
 type dim = int * int * int
 
@@ -25,6 +25,7 @@ and expr =
   | Assign of string * expr
   | Call of string * expr list
   | Noexpr
+
 
 type bind =  typ * string * dim * expr
 
@@ -56,6 +57,10 @@ type program = prog_element list
 
 
 (* Pretty-printing functions *)
+
+let fst3tuple = function (fst, _, _) -> fst 
+let snd3tuple = function (_, snd, _) -> snd  
+let trd3tuple = function (_, _, trd) -> trd 
 
 let string_of_op = function
     Add -> "+"
@@ -109,6 +114,7 @@ and
  string_of_2dmat = function mat2d -> "[" ^ String.concat ", " (List.map string_of_1dmat mat2d) ^ "]" and
  string_of_arr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_2dmat mat3d) ^ "]" 
 
+
 let string_of_typ = function
     Int -> "int"
   | Bool -> "bool"
@@ -116,6 +122,8 @@ let string_of_typ = function
   | Char -> "char"
   | String -> "string"
   | Void -> "void"
+  | Mat -> "mat"
+  | Img -> "img"
 
 
 let string_of_combind (t, id, expr) = match expr with
@@ -126,7 +134,7 @@ let string_of_combind (t, id, expr) = match expr with
 let string_of_vdecl (ty, id, dim, e) = match e with
   | Noexpr -> string_of_typ ty ^ " " ^ id ^ string_of_dim dim ^ ";\n"
   | _ -> string_of_typ ty ^ " " ^ id ^
-  string_of_dim dim ^ " = \n" ^ string_of_expr e ^ "\n"
+  string_of_dim dim ^ " = " ^ string_of_expr e ^ ";\n"
 
 let rec string_of_stmt = function
     Block(stmts) ->
@@ -150,18 +158,19 @@ let string_of_formals (ty, id, dim, e) = match e with
   | _ -> string_of_typ ty ^ " " ^ id ^
   string_of_dim dim ^ " = " ^ string_of_expr e ^ " "
 
+
 let string_of_fdecl fdecl =
   string_of_typ fdecl.typ ^ " " ^
   fdecl.fname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_func_body fdecl.body) ^
-  "}\n"
+  "}\n" 
 
 
-let string_of_program lst =
+let string_of_program lst = 
   let helper str = function
   | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
   | Func(f) -> str ^ string_of_fdecl f
   | Func_dcl(f) -> str ^ string_of_fdecl f
   in
-  List.fold_left helper "" lst
+  List.fold_left helper "" lst 

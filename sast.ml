@@ -58,6 +58,8 @@ let string_of_styp sty = let (ty, dim) = sty in match ty,dim with
   | Char,_ -> "char" ^ string_of_dim dim
   | String,_ -> "string" ^ string_of_dim dim
   | Void,_ -> "void" ^ string_of_dim dim
+  | Mat,_ -> "mat" ^ string_of_dim dim
+  | Img,_ -> "img" ^ string_of_dim dim
 
 let rec string_of_sexpr (t, e) =
   "(" ^ string_of_styp t ^ " : " ^ (match e with
@@ -85,8 +87,7 @@ and
 
 let string_of_svdecl (ty, id, dim, e) = match e with
   | (_, SNoexpr) -> string_of_styp ty ^ " " ^ id ^ string_of_dim dim ^ ";\n"
-  | _ -> string_of_styp ty ^ " " ^ id ^
-  string_of_dim dim ^ " = \n" ^ string_of_sexpr e ^ "\n"
+  | _ -> string_of_styp ty ^ " " ^ id ^ " = " ^ string_of_sexpr e ^ "\n"
 
 let rec string_of_sstmt = function
     SBlock(stmts) ->

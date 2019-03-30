@@ -49,8 +49,8 @@ rule token = parse
 | "float"  { FLOAT }
 | "char"   { CHAR }
 | "string" { STRING }
-(* | "mat"    { MAT } *)
-(* | "img"    { IMG } *)
+| "mat"    { MAT }
+| "img"    { IMG }
 | "void"   { VOID }
 (* | "struct" { STRUCT } *)
 | "true"   { BLIT(true)  }               (* bool *)
