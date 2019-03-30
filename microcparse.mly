@@ -3,10 +3,41 @@
 %{
 open Ast
 
-let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-1, -1, -1), expr)
+let bind_dcl = fun data_type variable_name expr -> (data_type, variable_name, (-1,-1,-1), expr)
+
+let get_len mat_nd = if (List.length mat_nd) <> 1 then List.length mat_nd else -1
+  (* check if dimensions are same *)
+let get_child_elements mat_nd = 
+    List.fold_left (fun x y -> x @ y) [] mat_nd
+
+let rec check_equal array fst_dim = 
+    if List.length array > 1 then 
+      if List.length (List.hd array) = fst_dim then check_equal (List.tl array) fst_dim
+      else raise(Failure("dimension check failure"))
+    else 
+      if List.length (List.hd array) = fst_dim then ()
+      else raise(Failure("dimension check failure")) 
+
+let get_dim mat_3d = 
+  check_equal mat_3d (List.length (List.hd mat_3d));
+  let dim3 = get_len mat_3d in  
+  let array_2d = mat_3d in
+  (* print_2d_list array_2d; *)
+  check_equal array_2d (List.length (List.hd array_2d));
+  let dim2 = get_len (List.hd array_2d) in
+  let array_1d = get_child_elements array_2d in
+  (* print_1d_list (List.hd array_1d); *)
+  check_equal array_1d (List.length (List.hd array_1d));
+  let dim1 = get_len (List.hd array_1d) in
+  (dim3, dim2, dim1)
+
+
+
+let bind_arr_dcl = fun ty id dim -> (ty, id, dim, Noexpr)
+
 %}
 
-%token LPAREN RPAREN /* LBRACK RBRACK */ LBRACE RBRACE
+%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token SEMI COMMA DOT
 %token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS /* MATMUL  */
 %token ASSIGN
@@ -55,11 +86,11 @@ fdecl_bodyless:
    body = [] }}
 
 fdecl:
-   typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
-     { { typ = $1;
-	 fname = $2;
-	 formals = List.rev $4;
-	 body = List.rev $7 }}
+  typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
+   { { typ = $1;
+  fname = $2;
+  formals = List.rev $4;
+  body = List.rev $7 }}
 
 formals_opt:
     /* nothing */ { [] }
@@ -85,6 +116,16 @@ func_body_list:
 vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
+  | typ ID LBRACK dimension RBRACK SEMI { bind_arr_dcl $1 $2 $4 }
+
+dim_opt:
+  |             { (-1, -1, -1)}
+  | dimension   { $1}
+
+dimension:
+  | LITERAL                          { (-1, -1, $1) }
+  | LITERAL COMMA LITERAL               { (-1, $1, $3) }
+  | LITERAL COMMA LITERAL COMMA LITERAL    { ($1, $3, $5) }
 
 stmt:
     expr SEMI                               { Expr $1               }
@@ -102,10 +143,11 @@ expr_opt:
 
 expr:
     LITERAL          { Literal($1)            }
-  | FLIT	           { Fliteral($1)           }
+  | FLIT             { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
+  | arr_opt           { ArrVal(get_dim $1, $1)           }
   | ID               { Id($1)                 }
  /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }
@@ -140,3 +182,58 @@ args_opt:
 args_list:
     expr                    { [$1] }
   | args_list COMMA expr { $3 :: $1 }
+
+
+arr_opt:
+  | arr_1d        { [[$1]] }
+  | arr_2d        { [$1] }
+  | arr_3d        { $1 }
+
+arr_3d:
+  arr_3d_start RBRACK { List.rev $1 }
+
+arr_3d_start:
+    LBRACK arr_2d       { [$2] }
+  | arr_3d_start COMMA arr_2d { $3 :: $1 }
+
+arr_2d:
+  arr_2d_start RBRACK { List.rev $1 }
+
+arr_2d_start:
+    LBRACK arr_1d       { [$2] }
+  | arr_2d_start COMMA arr_1d { $3 :: $1 }
+
+arr_1d:
+  arr_1d_start RBRACK { List.rev $1}
+
+arr_1d_start:
+  | LBRACK arr_ele       { [$2] }
+  | arr_1d_start COMMA arr_ele { $3::$1 }
+
+arr_ele:
+    LITERAL          { Literal($1)            }
+  | FLIT             { Fliteral($1)           }
+  | BLIT             { BoolLit($1)            }
+  | STRLIT           { StrLit($1)             }
+  | CHARLIT          { CharLit($1)            }
+  | ID               { Id($1)                 }
+  | arr_ele PLUS   arr_ele { Binop($1, Add,   $3)   }
+  | arr_ele MINUS  arr_ele { Binop($1, Sub,   $3)   }
+  | arr_ele TIMES  arr_ele { Binop($1, Mult,  $3)   }
+  | arr_ele DIVIDE arr_ele { Binop($1, Div,   $3)   }
+  | arr_ele MODULO arr_ele { Binop($1, Mod,   $3)   }
+  | arr_ele POWER  arr_ele { Binop($1, Pow,   $3)   }
+  | arr_ele EQ     arr_ele { Binop($1, Equal, $3)   }
+  | arr_ele NEQ    arr_ele { Binop($1, Neq,   $3)   }
+  | arr_ele LT     arr_ele { Binop($1, Less,  $3)   }
+  | arr_ele LEQ    arr_ele { Binop($1, Leq,   $3)   }
+  | arr_ele GT     arr_ele { Binop($1, Greater, $3) }
+  | arr_ele GEQ    arr_ele { Binop($1, Geq,   $3)   }
+  | arr_ele AND    arr_ele { Binop($1, And,   $3)   }
+  | arr_ele OR     arr_ele { Binop($1, Or,    $3)   }
+  | TRUE             { BoolLit(true) }
+  | FALSE            { BoolLit(false) }
+  | MINUS arr_ele %prec NOT { Unop(Neg, $2)      }
+  | NOT arr_ele         { Unop(Not, $2)          }
+  | ID LPAREN args_opt RPAREN { Call($1, $3)  }
+  | LPAREN arr_ele RPAREN { $2                   }

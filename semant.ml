@@ -12,11 +12,13 @@ module StringMap = Map.Make(String)
 let check program =
 
 
+  let comStype ty = (ty, (-1,-1,-1)) in
 (* Raise an exception if the given rvalue type cannot be assigned to
      the given lvalue type *)
   let check_assign lvaluet rvaluet err =
      if lvaluet = rvaluet then lvaluet else raise (Failure err)
-  in   
+  in 
+
 
   (* Return a variable from our current symbol table *)
   let type_of_identifier map s =
@@ -30,28 +32,79 @@ let check program =
     with Not_found -> raise (Failure ("unrecognized function " ^ s))
   in
 
+
+  let check_ty_list = function
+    | [] -> raise(Failure ("internal error: array should not be empty"))
+    | (hd :: tl) as orig_lst ->
+      let ty = fst hd in 
+      let check_type t lst = if t <> (fst lst) then
+        raise(Failure ("type in array is not unique")) else ()
+      in
+      ignore( List.iter (check_type ty) tl);
+      (ty, orig_lst)
+  in
+
+  let check_ty_list_list = function
+    | [] -> raise(Failure ("internal error: array should not be empty"))
+    | (hd :: tl) as orig_lst ->
+      let ty = fst hd in 
+      let check_type t lst = if t <> (fst lst) then
+        raise(Failure ("type in array is not unique")) else ()
+      in
+      ignore(List.iter (check_type ty) tl);
+      (ty, List.map (fun (_, l) -> l) orig_lst)
+  in
+
+  let check_ty_list_list_list dim = function
+    | [] -> raise(Failure ("internal error: array should not be empty"))
+    | (hd :: tl) as orig_lst ->
+      let ty = fst hd in 
+      let check_type t lst = if t <> (fst lst) then
+        raise(Failure ("type in array is not unique")) else ()
+      in
+      ignore(List.iter (check_type ty) tl);
+      ((fst ty,dim), SArrVal(List.map (fun (_, l) -> l) orig_lst))
+  in
+
+  let rec check_arr3 (v,f) arr3_tmp =
+    let (dim, arr3) = arr3_tmp in 
+    let (_,_,tmp) = List.fold_left check_arr2 (v,f,[]) arr3 in
+    let sarr3 = List.rev tmp in
+    check_ty_list_list_list dim sarr3
+
+  and check_arr2 (v,f,lst) arr2 = 
+    let (_,_,tmp) = List.fold_left check_arr1 (v,f,[]) arr2 in
+    let sarr2 = List.rev tmp in
+    (v,f,(check_ty_list_list sarr2) :: lst)
+
+  and check_arr1 (v,f,lst) arr1 =
+    let (_,_,tmp) = List.fold_left (fun (v,f,l) e -> (v,f,(check_expr (v,f) e) :: l)) (v,f,[]) arr1 in
+    let sarr1 = List.rev tmp in
+    (v,f,(check_ty_list sarr1) :: lst)
+
   (**** Check expr including type and function call correctness ****)
-  let rec check_expr (var_symbols, func_symbols) = function
-      Literal  l -> (Int, SLiteral l)
-    | Fliteral l -> (Float, SFliteral l)
-    | StrLit str -> (String, SStrLit str)
-    | CharLit ch -> (Char, SCharLit ch)
-    | BoolLit l  -> (Bool, SBoolLit l)
-    | Noexpr     -> (Void, SNoexpr)
+  and check_expr (var_symbols, func_symbols) = function
+      Literal  l -> (comStype Int, SLiteral l)
+    | Fliteral l -> (comStype Float, SFliteral l)
+    | StrLit str -> (comStype String, SStrLit str)
+    | CharLit ch -> (comStype Char, SCharLit ch)
+    | ArrVal arr -> check_arr3 (var_symbols, func_symbols) arr
+    | BoolLit l  -> (comStype Bool, SBoolLit l)
+    | Noexpr     -> (comStype Void, SNoexpr)
     | Id s       -> (type_of_identifier var_symbols s, SId s)
     | Assign(var, e) as ex -> 
         let lt = type_of_identifier var_symbols var
         and (rt, e') = check_expr (var_symbols, func_symbols) e in
-        let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
-          string_of_typ rt ^ " in " ^ string_of_expr ex
+        let err = "illegal assignment " ^ string_of_styp lt ^ " = " ^ 
+          string_of_styp rt ^ " in " ^ string_of_expr ex
         in (check_assign lt rt err, SAssign(var, (rt, e')))
     | Unop(op, e) as ex -> 
         let (t, e') = check_expr (var_symbols, func_symbols) e in
         let ty = match op with
-          Neg when t = Int || t = Float -> t
-        | Not when t = Bool -> Bool
+          Neg when t = (comStype Int) || t = (comStype Float) -> t
+        | Not when t = (comStype Bool) -> comStype Bool
         | _ -> raise (Failure ("illegal unary operator " ^ 
-                               string_of_uop op ^ string_of_typ t ^
+                               string_of_uop op ^ string_of_styp t ^
                                " in " ^ string_of_expr ex))
         in (ty, SUnop(op, (t, e')))
     | Binop(e1, op, e2) as e -> 
@@ -61,32 +114,32 @@ let check program =
         let same = t1 = t2 in
         (* Determine expression type based on operator and operand types *)
         let ty = match op with
-          Add | Sub | Mult | Div | Mod | Pow when same && t1 = Int   -> Int
-        | Add | Sub | Mult | Div | Pow when same && t1 = Float -> Float
-        | Equal | Neq            when same               -> Bool
+          Add | Sub | Mult | Div | Mod | Pow when same && t1 = (comStype Int)   -> comStype Int
+        | Add | Sub | Mult | Div | Pow when same && t1 = (comStype Float) -> comStype Float
+        | Equal | Neq            when same               -> comStype Bool
         | Less | Leq | Greater | Geq
-                   when same && (t1 = Int || t1 = Float) -> Bool
-        | And | Or when same && t1 = Bool -> Bool
+                   when same && (t1 = comStype Int || t1 = comStype Float) -> comStype Bool
+        | And | Or when same && t1 = comStype Bool -> comStype Bool
         | _ -> raise (
       Failure ("illegal binary operator " ^
-                     string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
-                     string_of_typ t2 ^ " in " ^ string_of_expr e))
+                     string_of_styp t1 ^ " " ^ string_of_op op ^ " " ^
+                     string_of_styp t2 ^ " in " ^ string_of_expr e))
         in (ty, SBinop((t1, e1'), op, (t2, e2')))
-    | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
+    | Call("print", [e]) -> (comStype Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in
         if List.length args != param_length then
           raise (Failure ("expecting " ^ string_of_int param_length ^ 
                           " arguments in " ^ string_of_expr call))
-        else let check_call (ft, _, _, _) e = 
+        else let check_call (ft, _, d, _) e =
           let (et, e') = check_expr (var_symbols, func_symbols) e in 
-          let err = "illegal argument found " ^ string_of_typ et ^
-            " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
-          in (check_assign ft et err, e')
+          let err = "illegal argument found " ^ string_of_styp et ^
+            " expected " ^ string_of_styp (ft,d) ^ " in " ^ string_of_expr e
+          in (check_assign (ft, d) et err, e')
         in
         let args' = List.map2 check_call fd.formals args
-        in (fd.typ, SCall(fname, args'))
+        in (comStype fd.typ, SCall(fname, args'))
   in
 
   (**** check dups in bind list auxiliary function ****)
@@ -129,12 +182,12 @@ let check program =
       | _,Call _ -> raise(Failure ("calling funciton in init not supported"))
       | _ -> ();
     match e with
-      | Noexpr -> (ty, n, d, (Void, SNoexpr))
+      | Noexpr -> ((ty, d), n, d, ((Void, (-1,-1,-1)), SNoexpr))
       | _ ->
     let (rt, e') = check_expr (var_symbols, func_symbols) e in
     let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^ 
-          string_of_typ rt ^ " in " ^ n ^ " = " ^ string_of_expr e
-      in (check_assign ty rt err, n, d, (rt, e'))
+          string_of_styp rt ^ " in " ^ n ^ " = " ^ string_of_expr e
+      in (check_assign (ty, d) rt err, n, d, (rt, e'))
   in
 
 
@@ -176,7 +229,7 @@ let check program =
     let check_bool_expr (var_symbols, func_symbols) e = 
       let (t', e') = check_expr (var_symbols, func_symbols) e
       and err = "expected Boolean expression in " ^ string_of_expr e
-      in if t' != Bool then raise (Failure err) else (t', e') 
+      in if t' != comStype Bool then raise (Failure err) else (t', e') 
     in
 
 
@@ -190,16 +243,16 @@ let check program =
         check_expr (var_symbols, func_symbols) e3, check_stmt (var_symbols, func_symbols) st)
       | While(p, s) -> SWhile(check_bool_expr (var_symbols, func_symbols) p, check_stmt (var_symbols, func_symbols) s)
       | Return e -> let (t, e') = check_expr (var_symbols, func_symbols) e in
-        if t = funct.typ then SReturn (t, e') 
+        if t = comStype funct.typ then SReturn (t, e') 
         else raise (
-    Failure ("return gives " ^ string_of_typ t ^ " expected " ^
+    Failure ("return gives " ^ string_of_styp t ^ " expected " ^
        string_of_typ funct.typ ^ " in " ^ string_of_expr e))
       | Block sl -> ignore(check_normal_dup sl); let (_, _, lst) = List.fold_left check_body_ele (var_symbols, func_symbols, []) sl in
         SBlock(List.rev lst)
     (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
-      | Dcl((ty, id, _, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
-      ((StringMap.add id ty var_symbols), func_symbols, SDcl(dcl) :: body_sast)
+      | Dcl((ty, id, dim, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+      ((StringMap.add id (ty, dim) var_symbols), func_symbols, SDcl(dcl) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
@@ -237,14 +290,14 @@ let check program =
     let () = isReturnInFunc ret_absent in
 
     let self_var_symbols =
-      List.fold_left (fun m (ty, id, _, _) -> StringMap.add id ty m) var_symbols funct.formals in
+      List.fold_left (fun m (ty, id, dim, _) -> StringMap.add id (ty, dim) m) var_symbols funct.formals in
 
    (* Check function body line by line while maintaining var and func symbol tables*)
     let (_, _, lst) = List.fold_left check_body_ele (self_var_symbols, func_symbols, []) funct.body in
 
     (* Return SFunc required in SAST *)
     SFunc{
-      styp = funct.typ;
+      styp = comStype funct.typ;
       sfname = funct.fname;
       sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d in dcl :: l) [] funct.formals);
       sbody = List.rev lst }
@@ -252,8 +305,8 @@ let check program =
 
 (*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
-    | Globaldcl((ty, id, _, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
-    ((StringMap.add id ty var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
+    | Globaldcl((ty, id, dim, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+    ((StringMap.add id (ty,dim) var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
     (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
     | Func_dcl(f) -> let new_func_symbols = add_func func_symbols f in

@@ -11,8 +11,8 @@ rule token = parse
 | "//"     { inlinecom lexbuf }
 | '('      { LPAREN }                   (* () [] {} *)
 | ')'      { RPAREN }
-(*| '['      { LBRACK }
-| ']'      { RBRACK }*)
+| '['      { LBRACK }
+| ']'      { RBRACK }
 | '{'      { LBRACE }
 | '}'      { RBRACE }
 | ';'      { SEMI }                     (* split *)

@@ -4,6 +4,23 @@ iMatrix, a language trying to make programming less painful for matrix and image
 ---
 ## Test
 Run ```./test.sh ```
+
+## Aboout this branch
+AST with array type  
+Buggy semantic check  
+Array type declaration with init is not supported  
+Ugly type identifier  
+var_symbols in semant now has type **(typ, dimension) StringMap.t**
+
+### Known bugs
+Array with only one element return common type instead of array type.  
+Info about function type in AST is not complete therefore array type function is not supported.  
+
+
+
+
+
+
 ## Progress
 Arbitrary position for global declarations, function declarations, local declarations and local statements.  
 ~~Syntactically allow inline initialization. Now inline initialization supports expression. (**TODO** codegen not finished)~~  
