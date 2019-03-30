@@ -10,6 +10,24 @@ let fst3tuple = function (fst, _, _) -> fst
 let snd3tuple = function (_, snd, _) -> snd  
 let trd3tuple = function (_, _, trd) -> trd 
 
+let get_dimension mat dim_num = 
+  let get_child_elements mat_nd = 
+    List.fold_left (fun x y -> x @ y) [] mat_nd in
+
+  let mat_3d = mat in
+  let dim3 = List.length mat_3d in  
+  let array_2d = mat_3d in
+  let dim2 = List.length (List.hd array_2d) in
+  let array_1d = get_child_elements array_2d in
+  let dim1 = List.length (List.hd array_1d) in
+  
+  if dim_num = 3 then (dim3, dim2, dim1) 
+  else begin
+    if dim_num = 2 then
+      (-1, dim2, dim1)
+    else 
+      (-1, -1, dim1)
+  end
 
 let create_zero_array dim = 
   let get_dim dim = if dim = -1 then 1 else dim in
@@ -27,12 +45,14 @@ let create_zero_array dim =
 
 
 let bind_arr_dcl t id dim = 
-  (t, id, dim, ArrVal(create_zero_array dim))
+  (t, id, dim, ArrVal(dim, create_zero_array dim))
 
-let bind_arr_with_dim ty id dim arr_val = 
-  (* let get_content = function | ArrVal(a) -> a in
-  let arr_val = get_content arr_val in  *)
-  let get_len mat_nd = if (List.length mat_nd) <> 1 then List.length mat_nd else -1  in
+let bind_arr_with_dim ty id dim arr_val dim_num = 
+  let get_dim_num dim = if fst3tuple dim <> -1 then 3 else begin
+                      if snd3tuple dim <> -1 then 2 else 1 end in
+  let check_dim_num dim_num1 dim_num2 = if dim_num1 <> dim_num2 then
+    raise(Failure("dimension check failure")) in
+  let get_len mat_nd = List.length mat_nd  in
   (* check if dimensions are same *)
   let get_child_elements mat_nd = 
     List.fold_left (fun x y -> x @ y) [] mat_nd in
@@ -45,38 +65,49 @@ let bind_arr_with_dim ty id dim arr_val =
       if List.length (List.hd array) = fst_dim then ()
       else raise(Failure("dimension check failure")) in
 
-  let check_dim mat_3d org_dim =
+  let check_dim mat mat_dim_num org_dim =
     let check_dim_corresp dim1  dim2 = 
-    if fst3tuple dim1 <> fst3tuple dim2 then
-      raise(Failure("dimension check failure"))
+    if get_dim_num dim1 <> get_dim_num dim2 then raise(Failure("dimension check failure"))
     else begin
-      if snd3tuple dim1 <> snd3tuple dim2 then
+      if fst3tuple dim1 <> fst3tuple dim2 then 
         raise(Failure("dimension check failure"))
       else begin
-        if trd3tuple dim1 <> trd3tuple dim2 then
+        if snd3tuple dim1 <> snd3tuple dim2 then
           raise(Failure("dimension check failure"))
-        else ()
-      end
+        else begin
+          if trd3tuple dim1 <> trd3tuple dim2 then
+            raise(Failure("dimension check failure"))
+          else () end
+      end 
     end in
-    check_equal mat_3d (List.length (List.hd mat_3d));
+
+    let _ = check_dim_num mat_dim_num (get_dim_num org_dim) in
+    let dim_num_inf = get_dim_num org_dim in
+    let mat_3d = mat in
+    let _ = check_equal mat_3d (List.length (List.hd mat_3d)) in
     let dim3 = get_len mat_3d in  
     let array_2d = mat_3d in
-    check_equal array_2d (List.length (List.hd array_2d));
+    let _ = check_equal array_2d (List.length (List.hd array_2d)) in
     let dim2 = get_len (List.hd array_2d) in
     let array_1d = get_child_elements array_2d in
-    check_equal array_1d (List.length (List.hd array_1d));
+    let _ = check_equal array_1d (List.length (List.hd array_1d)) in
     let dim1 = get_len (List.hd array_1d) in
+    
+    if dim_num_inf < 3 then let dim3 = -1 in
+    if dim_num_inf < 2 then let dim2 = -1 in 
     let dim_inf = (dim3, dim2, dim1) in
-    check_dim_corresp dim_inf org_dim in
+    print_int dim1;
+    print_int dim2;
+    print_int dim3;
+    check_dim_corresp dim_inf org_dim 
+    in
   
-  let dim_correct = check_dim arr_val dim in
-  (ty, id, dim, ArrVal(arr_val))
+  let _ = check_dim arr_val dim_num dim in
+  (ty, id, dim, ArrVal(dim, arr_val))
   
 
-let bind_arr_without_dim ty id arr_val = 
-  (* let get_content = function | ArrVal(a) -> a | _ -> [[[]]] in
-  let arr_val = get_content arr_val in *)
-  let get_len mat_nd = if (List.length mat_nd) <> 1 then List.length mat_nd else -1  in
+let bind_arr_without_dim ty id arr_val dim_num = 
+  let get_len mat_nd = List.length mat_nd  in
   (* check if dimensions are same *)
   let get_child_elements mat_nd = 
     List.fold_left (fun x y -> x @ y) [] mat_nd in
@@ -89,7 +120,7 @@ let bind_arr_without_dim ty id arr_val =
       if List.length (List.hd array) = fst_dim then ()
       else raise(Failure("dimension check failure")) in
 
-  let get_dim mat_3d = 
+  let check_dim mat_3d = 
     check_equal mat_3d (List.length (List.hd mat_3d));
     let dim3 = get_len mat_3d in  
     let array_2d = mat_3d in
@@ -100,7 +131,9 @@ let bind_arr_without_dim ty id arr_val =
     let dim1 = get_len (List.hd array_1d) in
     let dim = (dim3, dim2, dim1) in dim in
   
-  (ty, id, (get_dim arr_val), ArrVal(arr_val))
+  let _ = check_dim arr_val in
+  let dim_inf = get_dimension arr_val dim_num in
+  (ty, id, dim_inf , ArrVal(dim_inf, arr_val)) 
 
 %}
 
@@ -187,8 +220,12 @@ vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
   | typ ID LBRACK dimension RBRACK SEMI { bind_arr_dcl $1 $2 $4 }
-  | typ ID LBRACK dimension RBRACK ASSIGN arr_opt SEMI { bind_arr_with_dim $1 $2 $4 $7 }
-  | typ ID ASSIGN arr_opt SEMI { bind_arr_without_dim $1 $2 $4 }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_1d SEMI { bind_arr_with_dim $1 $2 $4 [[$7]] 1 }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_2d SEMI { bind_arr_with_dim $1 $2 $4 [$7] 2 }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_3d SEMI { bind_arr_with_dim $1 $2 $4 $7 3 }
+  | typ ID ASSIGN arr_1d SEMI { bind_arr_without_dim $1 $2 [[$4]] 1 }
+  | typ ID ASSIGN arr_2d SEMI { bind_arr_without_dim $1 $2 [$4] 2 }
+  | typ ID ASSIGN arr_3d SEMI { bind_arr_without_dim $1 $2 $4 3 }
 
 dim_opt:
   |             { (-1, -1, -1)}
@@ -219,7 +256,9 @@ expr:
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
-  | arr_opt           { ArrVal($1)           }
+  | arr_1d           { ArrVal((get_dimension [[$1]] 1), [[$1]])           }
+  | arr_2d           { ArrVal(get_dimension [$1] 2, [$1])           }
+  | arr_3d           { ArrVal(get_dimension $1 3, $1)           }
   | ID               { Id($1)                 }
  /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }
