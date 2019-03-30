@@ -16,7 +16,7 @@ let check program =
 (* Raise an exception if the given rvalue type cannot be assigned to
      the given lvalue type *)
   let check_assign lvaluet rvaluet err =
-     if lvaluet = rvaluet then lvaluet else raise (Failure err)
+    if lvaluet = rvaluet then lvaluet else raise (Failure err)
   in 
 
 
@@ -185,7 +185,7 @@ let check program =
       | Noexpr -> ((ty, d), n, d, ((Void, (-1,-1,-1)), SNoexpr))
       | _ ->
     let (rt, e') = check_expr (var_symbols, func_symbols) e in
-    let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^ 
+    let err = "illegal assignment " ^ string_of_styp (ty, d) ^ " = " ^ 
           string_of_styp rt ^ " in " ^ n ^ " = " ^ string_of_expr e
       in (check_assign (ty, d) rt err, n, d, (rt, e'))
   in

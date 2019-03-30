@@ -41,17 +41,23 @@ let create_zero_array dim =
   let zero3d = copy_arr [zero2d] [zero2d] dim1 in zero3d
 
 
+let internal_trans = function
+  | Mat -> Float
+  | Img -> Int
+  | _ as t -> t
+
 let bind_arr_dcl t id dim = match dim with
   | (-1,-1,-1) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | _ -> (t, id, dim, ArrVal(dim, create_zero_array dim))
+  | _ -> ((internal_trans t), id, dim, ArrVal(dim, create_zero_array dim))
 
 let bind_arr_opt ty id dim e = match dim,e with
-  | (-1,-1,-1),ArrVal(d, _) -> (ty, id, d, e)
-  | _,ArrVal(_) -> (ty,id,dim,e)
+  | (-1,-1,-1),ArrVal(d, _) -> ((internal_trans ty), id, d, e)
+  | _,ArrVal(_) -> ((internal_trans ty),id,dim,e)
   | _ -> raise(Failure("Array initialization only allows singleton"))
 
 let bind_dcl ty id e = match ty,e with
-  | Mat,ArrVal(d, _) | Img,ArrVal(d, _) -> bind_arr_opt ty id d e
+  | Mat,ArrVal(d, _) -> bind_arr_opt Float id d e
+  | Img,ArrVal(d, _) -> bind_arr_opt Int id d e
   | Mat,_ | Img,_ -> raise(Failure("array declartion without initialization should have specific dimension"))
   | _ -> (ty, id, (-1,-1,-1), e)
 
