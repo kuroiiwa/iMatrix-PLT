@@ -13,6 +13,8 @@ and sx =
   | SBinop of sexpr * op * sexpr
   | SUnop of uop * sexpr
   | SAssign of string * sexpr
+  | SMatassign of string * expr list list list
+  | SMatLit of expr list list list
   | SCall of string * sexpr list
   | SNoexpr
 
@@ -48,6 +50,7 @@ let rec string_of_sexpr (t, e) =
   | SFliteral(l) -> l
   | SStrLit(l) -> l
   | SCharLit(c) -> String.make 1 c
+  | SMatLit(m) -> string_of_mat m
   | SId(s) -> s
   | SBinop(e1, o, e2) ->
       string_of_sexpr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_sexpr e2

@@ -119,12 +119,16 @@ let check program =
 
 
     (**** Check expr including type and function call correctness ****)
+    (* let check_mat (var, matval) = function  *)
+
+
     let rec check_expr (var_symbols, func_symbols) = function
         Literal  l -> (Int, SLiteral l)
       | Fliteral l -> (Float, SFliteral l)
       | StrLit str -> (String, SStrLit str)
       | CharLit ch -> (Char, SCharLit ch)
       | BoolLit l  -> (Bool, SBoolLit l)
+      | Matval m -> (Mat, SMatLit m)  
       | Noexpr     -> (Void, SNoexpr)
       | Id s       -> (type_of_identifier var_symbols s, SId s)
       | Assign(var, e) as ex -> 
@@ -133,6 +137,11 @@ let check program =
           let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
             string_of_typ rt ^ " in " ^ string_of_expr ex
           in (check_assign lt rt err, SAssign(var, (rt, e')))
+      | Matassign(var, e) as ex ->
+          (* TO BE DONE: DIM CHECK *)
+          let lt = type_of_identifier var_symbols var 
+          and (rt, e') = check_expr (var_symbols, func_symbols) e
+          in (lt, SMatssign(var, (rt, e')))
       | Unop(op, e) as ex -> 
           let (t, e') = check_expr (var_symbols, func_symbols) e in
           let ty = match op with
