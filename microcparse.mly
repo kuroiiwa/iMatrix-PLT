@@ -3,6 +3,17 @@
 %{
 open Ast
 
+
+let bind_dcl data_type variable_name expr =
+    (* let check_list expr = 
+      try let _ = (List.hd expr) in raise(Failure("Failure: assign array to common variable"))
+      with Not_found -> () in *)
+    match data_type with
+    | Mat -> (data_type, variable_name, (-1,-1,-1), expr)
+    | Img -> (data_type, variable_name, (-1,-1,-1), expr)
+    | _ -> (* let _ = check_list expr in *) (data_type, variable_name, (-1,-1,-1), expr)
+
+
 let fst3tuple = function (fst, _, _) -> fst 
 let snd3tuple = function (_, snd, _) -> snd  
 let trd3tuple = function (_, _, trd) -> trd 
@@ -40,26 +51,130 @@ let create_zero_array dim =
   let zero2d = copy_arr [zero1d] [zero1d] dim2 in
   let zero3d = copy_arr [zero2d] [zero2d] dim1 in zero3d
 
+(* return the length of a ND array *)
+let get_len mat_nd = List.length mat_nd 
 
-let internal_trans = function
-  | Mat -> Float
-  | Img -> Int
-  | _ as t -> t
+(* given a dim tuple, return it's dimension number, e.g. (-1,1,2) -> 2 *)
+let get_dim_num dim = if fst3tuple dim <> -1 then 3 else begin
+                      if snd3tuple dim <> -1 then 2 else 1 end 
 
-let bind_arr_dcl t id dim = match dim with
-  | (-1,-1,-1) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | _ -> ((internal_trans t), id, dim, ArrVal(dim, create_zero_array dim))
+let bind_arr_dcl t id dim = 
+  (t, id, dim, ArrVal(dim, create_zero_array dim))
 
-let bind_arr_opt ty id dim e = match dim,e with
-  | (-1,-1,-1),ArrVal(d, _) -> ((internal_trans ty), id, d, e)
-  | _,ArrVal(_) -> ((internal_trans ty),id,dim,e)
-  | _ -> raise(Failure("Array initialization only allows singleton"))
 
-let bind_dcl ty id e = match ty,e with
-  | Mat,ArrVal(d, _) -> bind_arr_opt Float id d e
-  | Img,ArrVal(d, _) -> bind_arr_opt Int id d e
-  | Mat,_ | Img,_ -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | _ -> (ty, id, (-1,-1,-1), e)
+let type_dim_check_match ty dim_num = 
+  (* given image, only allow 3 dimension ;
+     given matrix, only allow 1 or 2 dimension;
+     other type, allow all dimensions *)
+     match ty with
+      | Img -> if dim_num <> 3 then raise(Failure("Image type can only be 3-dimensional"))
+              else ()
+      | Mat -> if dim_num = 3 then raise(Failure
+                      ("Matrix type can only be 1-dimensional or 2-dimensional"))
+              else ()
+      | _ -> ()
+
+let bind_arr_with_dim ty id dim arr_val dim_num = 
+  let check_dim_num dim_num1 dim_num2 = if dim_num1 <> dim_num2 then
+    raise(Failure("dimension check failure")) in
+  (* check if dimensions are same *)
+  let get_child_elements mat_nd = 
+    List.fold_left (fun x y -> x @ y) [] mat_nd in
+
+  let rec check_equal array fst_dim = 
+    if List.length array > 1 then 
+      if List.length (List.hd array) = fst_dim then check_equal (List.tl array) fst_dim
+      else raise(Failure("dimension check failure"))
+    else 
+      if List.length (List.hd array) = fst_dim then ()
+      else raise(Failure("dimension check failure")) in
+
+  let check_dim mat mat_dim_num org_dim =
+    let check_dim_corresp dim1  dim2 = 
+    if get_dim_num dim1 <> get_dim_num dim2 then raise(Failure("dimension check failure"))
+    else begin
+      if fst3tuple dim1 <> fst3tuple dim2 then 
+        raise(Failure("dimension check failure"))
+      else begin
+        if snd3tuple dim1 <> snd3tuple dim2 then
+          raise(Failure("dimension check failure"))
+        else begin
+          if trd3tuple dim1 <> trd3tuple dim2 then
+            raise(Failure("dimension check failure"))
+          else () end
+      end 
+    end in
+
+    let _ = check_dim_num mat_dim_num (get_dim_num org_dim) in
+    let dim_num_inf = get_dim_num org_dim in
+    let mat_3d = mat in
+    let _ = check_equal mat_3d (List.length (List.hd mat_3d)) in
+    let dim3 = get_len mat_3d in  
+    let array_2d = mat_3d in
+    let _ = check_equal array_2d (List.length (List.hd array_2d)) in
+    let dim2 = get_len (List.hd array_2d) in
+    let array_1d = get_child_elements array_2d in
+    let _ = check_equal array_1d (List.length (List.hd array_1d)) in
+    let dim1 = get_len (List.hd array_1d) in
+    
+    if dim_num_inf < 3 then let dim3 = -1 in
+    if dim_num_inf < 2 then let dim2 = -1 in 
+    let dim_inf = (dim3, dim2, dim1) in
+    (* print_int dim1;
+    print_int dim2;
+    print_int dim3; *)
+    check_dim_corresp dim_inf org_dim 
+    in
+  
+  let _ = check_dim arr_val dim_num dim in
+  type_dim_check_match ty dim_num;
+  (ty, id, dim, ArrVal(dim, arr_val))
+
+let rec check_equal array fst_dim = 
+  (* check if every subarray has the same dimension, e.g.[[1],[1,2]] is not legal *)
+  if List.length array > 1 then 
+    if List.length (List.hd array) = fst_dim then check_equal (List.tl array) fst_dim
+    else raise(Failure("dimension check failure"))
+  else 
+    if List.length (List.hd array) = fst_dim then ()
+    else raise(Failure("dimension check failure")) 
+
+let get_child_elements mat_nd = 
+  (* given a higher order array, extract its children, 
+     e.g. [[1,2,3],[4,5,6]] -> [1,2,3,4,5,6] *)
+  List.fold_left (fun x y -> x @ y) [] mat_nd 
+
+let infer_dim_3darr arr = 
+  (* given a 3d array, infer it's dimension (include dimension check) *)
+  let dim3 = get_len arr in  
+  let array_2d = arr in
+  check_equal array_2d (List.length (List.hd array_2d));
+  let dim2 = get_len (List.hd array_2d) in
+  let array_1d = get_child_elements array_2d in
+  check_equal array_1d (List.length (List.hd array_1d));
+  let dim1 = get_len (List.hd array_1d) in
+  let dim = (dim3, dim2, dim1) in dim 
+
+let infer_dim_2darr arr = 
+  (* given a 2d array, infer it's dimension (include dimension check) *)
+  let array_2d = arr in
+  check_equal array_2d (List.length (List.hd array_2d));
+  let dim2 = get_len array_2d in
+  let array_1d = get_child_elements array_2d in
+  let dim1 = get_len (List.hd array_2d) in
+  let dim = (-1, dim2, dim1) in dim
+
+let infer_dim_1darr arr = 
+  (* given a 1d array, infer it's dimension (include dimension check) *)
+  let array_1d = arr in
+  let dim1 = get_len array_1d in
+  let dim = (-1, -1, dim1) in dim
+
+let bind_arr_without_dim ty id arr_val dim_inf = 
+  (* given type, id, array value expression and infered dimension,
+     return the corresponding 'bind' type (see 'bind' in 'ast.ml') *)
+  type_dim_check_match ty (get_dim_num dim_inf);
+  (ty, id, dim_inf , ArrVal(dim_inf, arr_val))  
 
 %}
 
@@ -113,11 +228,11 @@ fdecl_bodyless:
    body = [] }}
 
 fdecl:
-  typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
-   { { typ = $1;
-  fname = $2;
-  formals = List.rev $4;
-  body = List.rev $7 }}
+   typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
+     { { typ = $1;
+	 fname = $2;
+	 formals = List.rev $4;
+	 body = List.rev $7 }}
 
 formals_opt:
     /* nothing */ { [] }
@@ -144,9 +259,15 @@ func_body_list:
 
 vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
+  | typ ID LBRACK dimension RBRACK SEMI { bind_arr_dcl $1 $2 $4 }
+  | typ ID LBRACK RBRACK ASSIGN arr_1d SEMI { bind_arr_without_dim $1 $2 [[$6]] (infer_dim_1darr $6)  }
+  | typ ID LBRACK RBRACK ASSIGN arr_2d SEMI { bind_arr_without_dim $1 $2 [$6] (infer_dim_2darr $6) }
+  | typ ID LBRACK RBRACK ASSIGN arr_3d SEMI { bind_arr_without_dim $1 $2 $6 (infer_dim_3darr $6) }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_1d SEMI { bind_arr_with_dim $1 $2 $4 [[$7]] 1 }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_2d SEMI { bind_arr_with_dim $1 $2 $4 [$7] 2 }
+  | typ ID LBRACK dimension RBRACK ASSIGN arr_3d SEMI { bind_arr_with_dim $1 $2 $4 $7 3 }
+  /* | INT ID ASSIGN arr_opt SEMI  { raise(Failure("Assigning array to variables without dimension")) } */
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
-  | typ ID LBRACK dim_opt RBRACK SEMI { bind_arr_dcl $1 $2 $4 }
-  | typ ID LBRACK dim_opt RBRACK ASSIGN expr SEMI { bind_arr_opt $1 $2 $4 $7}
 
 dim_opt:
   |             { (-1, -1, -1)}
@@ -173,7 +294,7 @@ expr_opt:
 
 expr:
     LITERAL          { Literal($1)            }
-  | FLIT             { Fliteral($1)           }
+  | FLIT	           { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
@@ -215,6 +336,11 @@ args_list:
     expr                    { [$1] }
   | args_list COMMA expr { $3 :: $1 }
 
+
+arr_opt:
+  | arr_1d        { [[$1]] }
+  | arr_2d        { [$1] }
+  | arr_3d        { $1 }
 
 arr_3d:
   arr_3d_start RBRACK { List.rev $1 }
