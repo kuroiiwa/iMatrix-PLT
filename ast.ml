@@ -1,23 +1,30 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
-type op = Add | Sub | Mult | Div | Mod | Pow | Selfplus | Selfminus| Equal | Neq | Less | Leq | Greater | Geq |
+type op = Add | Sub | Mult | Div | Mod | Pow | Equal | Neq | Less | Leq | Greater | Geq |
           And | Or
 
 type uop = Neg | Not
 
-type typ = Int | Bool | Float | Char | String | Void | Mat | Img
 
-type dim = int * int * int
+type typ = Int | Bool | Float | Char | String | Void | Mat of mat_type | Img of img_type | Array of arr_type
 
-type arr_val = dim * (expr list list list)
+and mat_type = int * int
+and img_type = int * int * int
+and arr_type = typ * int
 
+
+type arr3_val = expr list list list
+and arr2_val = expr list list
+and arr1_val = expr list
 and expr =
     Literal of int
   | Fliteral of string
   | BoolLit of bool
   | StrLit of string
   | CharLit of char
-  | ArrVal of arr_val
+  | Arr1Val of arr1_val
+  | Arr2Val of arr2_val
+  | Arr3Val of arr3_val
   | Id of string
   | Binop of expr * op * expr
  (* | Getattr of string * string *)
@@ -27,7 +34,7 @@ and expr =
   | Noexpr
 
 
-type bind =  typ * string * dim * expr
+type bind =  typ * string * expr
 
     (* Matrix -> failwith("should assign the size for matrix type") *)
 
@@ -57,11 +64,6 @@ type program = prog_element list
 
 
 (* Pretty-printing functions *)
-
-let fst3tuple = function (fst, _, _) -> fst 
-let snd3tuple = function (_, snd, _) -> snd  
-let trd3tuple = function (_, _, trd) -> trd 
-
 let string_of_op = function
     Add -> "+"
   | Sub -> "-"
@@ -69,8 +71,6 @@ let string_of_op = function
   | Div -> "/"
   | Mod -> "%"
   | Pow -> "^"
-  | Selfplus -> "++"
-  | Selfminus -> "--"
  (* | Matmul -> "*." *)
   | Equal -> "=="
   | Neq -> "!="
@@ -85,18 +85,15 @@ let string_of_uop = function
     Neg -> "-"
   | Not -> "!"
 
-let notMinusOne a = if a <> -1 then " " ^ string_of_int a else ""
-let string_of_dim = function
-  | (-1,-1,-1) -> ""
-  | (a, b, c) ->
-  "[" ^ notMinusOne a ^ notMinusOne b ^ notMinusOne c ^ " ]"
 
 let rec string_of_expr = function
     Literal(l) -> string_of_int l
   | Fliteral(l) -> l
   | StrLit(l) -> l
   | CharLit(c) -> String.make 1 c
-  | ArrVal(d, a)  -> string_of_dim d ^ " " ^ string_of_arr a
+  | Arr1Val(arr) -> string_of_1dmat arr
+  | Arr2Val(arr) -> string_of_2dmat arr
+  | Arr3Val(arr) -> string_of_arr arr
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
   | Id(s) -> s
@@ -110,20 +107,25 @@ let rec string_of_expr = function
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Noexpr -> ""
 and
- string_of_1dmat = function mat1d -> "[" ^ (String.concat ", " (List.map string_of_expr mat1d)) ^ "]" and
+ string_of_1dmat = function mat1d -> "[" ^ String.concat ", " (List.map string_of_expr mat1d) ^ "]" and
  string_of_2dmat = function mat2d -> "[" ^ String.concat ", " (List.map string_of_1dmat mat2d) ^ "]" and
  string_of_arr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_2dmat mat3d) ^ "]" 
 
 
-let string_of_typ = function
+let rec string_of_dim str  = function
+  | Array(t,a) -> let new_str = str ^ "[" ^ string_of_int a ^ "]" in string_of_dim new_str t
+  | _ as t -> string_of_typ t ^ str
+
+and string_of_typ = function
     Int -> "int"
   | Bool -> "bool"
   | Float -> "float"
   | Char -> "char"
   | String -> "string"
   | Void -> "void"
-  | Mat -> "mat"
-  | Img -> "img"
+  | Mat(a,b) -> "mat[" ^ string_of_int a ^ "," ^ string_of_int b ^ "]"
+  | Img(a,b,c) -> "img[" ^ string_of_int a ^ "," ^ string_of_int b ^ "," ^ string_of_int c ^ "]"
+  | Array(_, _) as arr -> string_of_dim "" arr 
 
 
 let string_of_combind (t, id, expr) = match expr with
@@ -131,10 +133,9 @@ let string_of_combind (t, id, expr) = match expr with
   | _ -> string_of_typ t ^ " " ^ id ^ " = "^ string_of_expr expr ^";\n"
 
 
-let string_of_vdecl (ty, id, dim, e) = match e with
-  | Noexpr -> string_of_typ ty ^ " " ^ id ^ string_of_dim dim ^ ";\n"
-  | _ -> string_of_typ ty ^ " " ^ id ^
-  string_of_dim dim ^ " = " ^ string_of_expr e ^ ";\n"
+let string_of_vdecl (ty, id, e) = match e with
+  | Noexpr -> string_of_typ ty ^ " " ^ id ^ ";\n"
+  | _ -> string_of_typ ty ^ " " ^ id ^ " = " ^ string_of_expr e ^ ";\n"
 
 let rec string_of_stmt = function
     Block(stmts) ->
@@ -153,10 +154,9 @@ and
   | Dcl(d) -> string_of_vdecl d
   | Stmt(st) -> string_of_stmt st
 
-let string_of_formals (ty, id, dim, e) = match e with
-  | Noexpr -> string_of_typ ty ^ " " ^ id ^ string_of_dim dim ^ ", "
-  | _ -> string_of_typ ty ^ " " ^ id ^
-  string_of_dim dim ^ " = " ^ string_of_expr e ^ " "
+let string_of_formals (ty, id, e) = match e with
+  | Noexpr -> string_of_typ ty ^ " " ^ id  ^ ", "
+  | _ -> string_of_typ ty ^ " " ^ id ^ " = " ^ string_of_expr e ^ " "
 
 
 let string_of_fdecl fdecl =

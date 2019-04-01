@@ -3,63 +3,31 @@
 %{
 open Ast
 
-let fst3tuple = function (fst, _, _) -> fst 
-let snd3tuple = function (_, snd, _) -> snd  
-let trd3tuple = function (_, _, trd) -> trd 
+let bind_arr_dcl_noexpr t id dim = match t,dim with
+  | _,(0,0,0) -> raise(Failure("array declartion without initialization should have specific dimension"))
+  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, Noexpr)
+  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, Noexpr)
+  | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
+  | _,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
+  | _,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
+  | _,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
+  | _ -> raise(Failure("dimension error"))
 
-let get_dimension mat dim_num = 
-  let get_child_elements mat_nd = 
-    List.fold_left (fun x y -> x @ y) [] mat_nd in
+let bind_arr_dcl_expr t id dim e = match t,dim with
+  | Mat(_,_),(0,0,0) -> (t, id, e)
+  | Img(_,_,_),(0,0,0) -> (t, id, e)
+  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, e)
+  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, e)
+  | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
+  | _,(0,0,0) -> (Array(t, 0), id, e) (* canary value here *)
+  | _,(0,0,a) when a > 0 -> (Array(t,a), id, e)
+  | _,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, e)
+  | _,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, e)
+  | _ -> raise(Failure("dimension error"))
 
-  let mat_3d = mat in
-  let dim3 = List.length mat_3d in  
-  let array_2d = mat_3d in
-  let dim2 = List.length (List.hd array_2d) in
-  let array_1d = get_child_elements array_2d in
-  let dim1 = List.length (List.hd array_1d) in
-  
-  if dim_num = 3 then (dim3, dim2, dim1) 
-  else begin
-    if dim_num = 2 then
-      (-1, dim2, dim1)
-    else 
-      (-1, -1, dim1)
-  end
-
-let create_zero_array dim = 
-  let get_dim dim = if dim = -1 then 1 else dim in
-  let dim1 = get_dim (fst3tuple dim) in
-  let dim2 = get_dim (snd3tuple dim) in
-  let dim3 = get_dim (trd3tuple dim) in
-
-  let rec copy_arr arr ele_arr count = 
-    if count = 1 then arr
-    else copy_arr (arr @ ele_arr) ele_arr (count - 1) in
-
-  let zero1d = copy_arr [Literal(0)] [Literal(0)] dim3 in
-  let zero2d = copy_arr [zero1d] [zero1d] dim2 in
-  let zero3d = copy_arr [zero2d] [zero2d] dim1 in zero3d
-
-
-let internal_trans = function
-  | Mat -> Float
-  | Img -> Int
-  | _ as t -> t
-
-let bind_arr_dcl t id dim = match dim with
-  | (-1,-1,-1) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | _ -> ((internal_trans t), id, dim, ArrVal(dim, create_zero_array dim))
-
-let bind_arr_opt ty id dim e = match dim,e with
-  | (-1,-1,-1),ArrVal(d, _) -> ((internal_trans ty), id, d, e)
-  | _,ArrVal(_) -> ((internal_trans ty),id,dim,e)
-  | _ -> raise(Failure("Array initialization only allows singleton"))
-
-let bind_dcl ty id e = match ty,e with
-  | Mat,ArrVal(d, _) -> bind_arr_opt Float id d e
-  | Img,ArrVal(d, _) -> bind_arr_opt Int id d e
-  | Mat,_ | Img,_ -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | _ -> (ty, id, (-1,-1,-1), e)
+let bind_dcl ty id e = match ty with
+  | Mat(_) | Img(_) -> raise(Failure("array declartion without initialization should have specific dimension"))
+  | _ -> (ty, id, e)
 
 %}
 
@@ -134,8 +102,8 @@ typ:
   | CHAR  { Char }
   | STRING { String }
   | VOID  { Void  }
-  | MAT   { Mat }
-  | IMG   { Img }
+  | MAT   { Mat(0,0) }
+  | IMG   { Img(0,0,0) }
 
 func_body_list:
     /* nothing */ { [] }
@@ -145,16 +113,16 @@ func_body_list:
 vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
-  | typ ID LBRACK dim_opt RBRACK SEMI { bind_arr_dcl $1 $2 $4 }
-  | typ ID LBRACK dim_opt RBRACK ASSIGN expr SEMI { bind_arr_opt $1 $2 $4 $7}
+  | typ ID LBRACK dim_opt RBRACK SEMI { bind_arr_dcl_noexpr $1 $2 $4 }
+  | typ ID LBRACK dim_opt RBRACK ASSIGN expr SEMI { bind_arr_dcl_expr $1 $2 $4 $7}
 
 dim_opt:
-  |             { (-1, -1, -1)}
+  |             { (0, 0, 0)}
   | dimension   { $1}
 
 dimension:
-  | LITERAL                          { (-1, -1, $1) }
-  | LITERAL COMMA LITERAL               { (-1, $1, $3) }
+  | LITERAL                          { (0, 0, $1) }
+  | LITERAL COMMA LITERAL               { (0, $1, $3) }
   | LITERAL COMMA LITERAL COMMA LITERAL    { ($1, $3, $5) }
 
 stmt:
@@ -177,9 +145,9 @@ expr:
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
-  | arr_1d           { ArrVal((get_dimension [[$1]] 1), [[$1]])           }
-  | arr_2d           { ArrVal(get_dimension [$1] 2, [$1])           }
-  | arr_3d           { ArrVal(get_dimension $1 3, $1)           }
+  | arr_1d           { Arr1Val($1)           }
+  | arr_2d           { Arr2Val($1)           }
+  | arr_3d           { Arr3Val($1)           }
   | ID               { Id($1)                 }
  /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }
@@ -262,5 +230,5 @@ arr_ele:
   | FALSE            { BoolLit(false) }
   | MINUS arr_ele %prec NOT { Unop(Neg, $2)      }
   | NOT arr_ele         { Unop(Not, $2)          }
-  | ID LPAREN args_opt RPAREN { Call($1, $3)  }
+  | ID LPAREN args_opt RPAREN { Call($1, $3)  } /* might need to be forbidden */
   | LPAREN arr_ele RPAREN { $2                   }  

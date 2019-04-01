@@ -2,10 +2,8 @@
 
 open Ast
 
-type styp = typ * dim
-
-type sarr_val = sexpr list list list
-and sexpr = styp * sx
+type sarr_val = sexpr list
+and sexpr = typ * sx
 and sx =
     SLiteral of int
   | SFliteral of string
@@ -20,7 +18,7 @@ and sx =
   | SCall of string * sexpr list
   | SNoexpr
 
-type sbind =  styp * string * dim * sexpr
+type sbind =  typ * string * sexpr
 
 type sstmt =
     SBlock of sbody list
@@ -33,7 +31,7 @@ and sbody = SStmt of sstmt
            | SDcl of sbind
 
 type sfunc_decl = {
-    styp : styp;
+    styp : typ;
     sfname : string;
     sformals : sbind list;
     sbody : sbody list;
@@ -45,30 +43,15 @@ type sprog_element = SGlobaldcl of sbind
 type sprogram = sprog_element list
 
 (* Pretty-printing functions *)
-let string_of_styp sty = let (ty, dim) = sty in match ty,dim with
-    Int,(-1,-1,-1) -> "int"
-  | Bool,(-1,-1,-1) -> "bool"
-  | Float,(-1,-1,-1) -> "float"
-  | Char,(-1,-1,-1) -> "char"
-  | String,(-1,-1,-1) -> "string"
-  | Void,(-1,-1,-1) -> "void"
-  | Int,_ -> "int" ^ string_of_dim dim
-  | Bool,_ -> "bool" ^ string_of_dim dim
-  | Float,_ -> "float" ^ string_of_dim dim
-  | Char,_ -> "char" ^ string_of_dim dim
-  | String,_ -> "string" ^ string_of_dim dim
-  | Void,_ -> "void" ^ string_of_dim dim
-  | Mat,_ -> "mat" ^ string_of_dim dim
-  | Img,_ -> "img" ^ string_of_dim dim
 
 let rec string_of_sexpr (t, e) =
-  "(" ^ string_of_styp t ^ " : " ^ (match e with
+  "(" ^ string_of_typ t ^ " : " ^ (match e with
     SLiteral(l) -> string_of_int l
   | SBoolLit(true) -> "true"
   | SBoolLit(false) -> "false"
   | SFliteral(l) -> l
   | SStrLit(l) -> l
-  | SArrVal(arr) -> string_of_sarr arr
+  | SArrVal(arr) -> "[" ^ String.concat ", " (List.map string_of_sexpr arr) ^ "]"
   | SCharLit(c) -> String.make 1 c
   | SId(s) -> s
   | SBinop(e1, o, e2) ->
@@ -85,9 +68,9 @@ and
  string_of_sarr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_s2dmat mat3d) ^ "]"   
 
 
-let string_of_svdecl (ty, id, dim, e) = match e with
-  | (_, SNoexpr) -> string_of_styp ty ^ " " ^ id ^ string_of_dim dim ^ ";\n"
-  | _ -> string_of_styp ty ^ " " ^ id ^ " = " ^ string_of_sexpr e ^ "\n"
+let string_of_svdecl (ty, id, e) = match e with
+  | (_,SNoexpr) -> string_of_typ ty ^ " " ^ id ^ ";\n"
+  | _ -> string_of_typ ty ^ " " ^ id ^ " = " ^ string_of_sexpr e ^ "\n"
 
 let rec string_of_sstmt = function
     SBlock(stmts) ->
@@ -107,13 +90,12 @@ and
   | SDcl(d) -> string_of_svdecl d
   | SStmt(st) -> string_of_sstmt st
 
-let string_of_sformals (ty, id, dim, e) = match e with
-  | (_, SNoexpr) -> string_of_styp ty ^ " " ^ id ^ string_of_dim dim ^ ", "
-  | _ -> string_of_styp ty ^ " " ^ id ^
-  string_of_dim dim ^ " = " ^ string_of_sexpr e ^ " "
+let string_of_sformals (ty, id, e) = match e with
+  | (_,SNoexpr) -> string_of_typ ty ^ " " ^ id ^ ", "
+  | _ -> string_of_typ ty ^ " " ^ id ^ " = " ^ string_of_sexpr e ^ " "
 
 let string_of_sfdecl fdecl =
-  string_of_styp fdecl.styp ^ " " ^
+  string_of_typ fdecl.styp ^ " " ^
   fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_sformals fdecl.sformals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
