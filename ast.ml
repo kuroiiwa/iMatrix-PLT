@@ -25,6 +25,7 @@ and expr =
   | Arr1Val of arr1_val
   | Arr2Val of arr2_val
   | Arr3Val of arr3_val
+  | Slice of string * ((int * int) list)
   | Id of string
   | Binop of expr * op * expr
  (* | Getattr of string * string *)
@@ -94,6 +95,7 @@ let rec string_of_expr = function
   | Arr1Val(arr) -> string_of_1dmat arr
   | Arr2Val(arr) -> string_of_2dmat arr
   | Arr3Val(arr) -> string_of_arr arr
+  | Slice(n, lst) -> n ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_int a ^ ":" ^ string_of_int b ^ "]") lst)
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
   | Id(s) -> s

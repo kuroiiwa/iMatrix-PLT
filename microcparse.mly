@@ -33,7 +33,7 @@ let bind_dcl ty id e = match ty with
 
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
-%token SEMI COMMA DOT
+%token SEMI COMMA DOT COLON
 %token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS /* MATMUL  */
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
@@ -93,7 +93,9 @@ formals_opt:
 
 formal_list:
     typ ID                   { [bind_dcl $1 $2 Noexpr]     }
+  | typ ID LBRACK dimension RBRACK { [bind_arr_dcl_noexpr $1 $2 $4] }
   | formal_list COMMA typ ID { (bind_dcl $3 $4 Noexpr) :: $1 }
+  | formal_list COMMA typ ID LBRACK dimension RBRACK { (bind_arr_dcl_noexpr $3 $4 $6) :: $1 }
 
 typ:
     INT   { Int   }
@@ -149,6 +151,7 @@ expr:
   | arr_2d           { Arr2Val($1)           }
   | arr_3d           { Arr3Val($1)           }
   | ID               { Id($1)                 }
+  | ID slice_opt        { Slice($1, $2)    }
  /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
   | expr PLUS   expr { Binop($1, Add,   $3)   }
   | expr MINUS  expr { Binop($1, Sub,   $3)   }
@@ -183,6 +186,17 @@ args_list:
     expr                    { [$1] }
   | args_list COMMA expr { $3 :: $1 }
 
+slice_opt:
+  | slice   { [$1] }
+  | slice slice  { $1 :: [$2] }
+  | slice slice slice {$1 :: $2 :: [$3] }
+
+slice:
+  | LBRACK LITERAL RBRACK               { ($2, $2) }
+  | LBRACK LITERAL COLON LITERAL RBRACK { ($2, $4) }
+  | LBRACK COLON LITERAL RBRACK         { (-1, $3) }
+  | LBRACK LITERAL COLON RBRACK         { ($2, -1) }
+  | LBRACK COLON RBRACK                 { (-1, -1) }
 
 arr_3d:
   arr_3d_start RBRACK { List.rev $1 }
