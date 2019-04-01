@@ -12,6 +12,7 @@ and sx =
   | SCharLit of char
   | SArrVal of sarr_val
   | SId of string
+  | SSlice of string * ((int * int) list)
   | SBinop of sexpr * op * sexpr
   | SUnop of uop * sexpr
   | SAssign of string * sexpr
@@ -54,6 +55,7 @@ let rec string_of_sexpr (t, e) =
   | SArrVal(arr) -> "[" ^ String.concat ", " (List.map string_of_sexpr arr) ^ "]"
   | SCharLit(c) -> String.make 1 c
   | SId(s) -> s
+  | SSlice(n, lst) -> n ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_int a ^ ":" ^ string_of_int b ^ "]") lst)
   | SBinop(e1, o, e2) ->
       string_of_sexpr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_sexpr e2
   | SUnop(o, e) -> string_of_uop o ^ string_of_sexpr e

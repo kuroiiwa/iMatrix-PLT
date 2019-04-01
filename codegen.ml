@@ -34,25 +34,46 @@ let translate program =
   and void_t     = L.void_type   context in
 
   let string_t   = L.pointer_type i8_t
-  and array1_i32_t   = L.pointer_type i32_t 
+  and array1_i32_t   = L.pointer_type i32_t
   and array1_float_t = L.pointer_type float_t in
 
-  let array2_i32_t   = L.pointer_type array1_i32_t in
+  let array2_i32_t   = L.pointer_type array1_i32_t 
+  and array2_float_t = L.pointer_type array1_float_t in
 
-  let array3_i32_t   = L.pointer_type array2_i32_t in
+  let array3_i32_t   = L.pointer_type array2_i32_t 
+  and array3_float_t = L.pointer_type array2_float_t in
 
+
+  (* array type and dimension helper function *)
+  let rec arr_type_helper t =
+    let rec get_dim n = function
+      | A.Array(t, _) -> get_dim (n+1) t
+      | _ -> n
+    in
+    let rec get_type_arr = function
+      | A.Array(t, _) -> get_type_arr t
+      | _ as t -> t
+    in
+    (get_type_arr t, get_dim 0 t)
+  in
 
   (* Return the LLVM type for a MicroC type *)
   let ltype_of_typ = function
-      A.Int,(-1,-1,-1)   -> i32_t
-    | A.Bool,(-1,-1,-1)  -> i1_t
-    | A.Float,(-1,-1,-1) -> float_t
-    | A.Void,(-1,-1,-1)  -> void_t
-    | A.Char,(-1,-1,-1)  -> i8_t
-    | A.String,(-1,-1,-1) -> string_t
-    | A.Int,(-1,-1,_) -> array1_i32_t
-    | A.Int,(-1,_,_) -> array2_i32_t
-    | A.Int,(_,_,_) -> array3_i32_t
+      A.Int   -> i32_t
+    | A.Bool  -> i1_t
+    | A.Float -> float_t
+    | A.Void  -> void_t
+    | A.Char  -> i8_t
+    | A.String -> string_t
+    | A.Array(_) as t -> let (ty, dim) = arr_type_helper t in
+          (match ty,dim with
+            | A.Int,1 ->  array1_i32_t
+            | A.Int,2 ->  array2_i32_t
+            | A.Int,3 ->  array3_i32_t
+            | A.Float,1 -> array1_float_t
+            | A.Float,2 -> array2_float_t
+            | A.Float,3 -> array3_float_t
+            | _ -> raise(Failure("internal error with dimension")))
     | _ -> raise(Failure("type not supported"))
   in
 
@@ -68,7 +89,7 @@ let translate program =
     let function_decl m fdecl =
       let name = fdecl.sfname
       and formal_types = 
-  Array.of_list (List.map (fun (t, _, _, _) -> ltype_of_typ t) fdecl.sformals)
+  Array.of_list (List.map (fun (t, _, _) -> ltype_of_typ t) fdecl.sformals)
       in let ftype = L.function_type (ltype_of_typ fdecl.styp) formal_types in
       StringMap.add name (L.define_function name ftype the_module, fdecl) m in
     List.fold_left function_decl StringMap.empty functions in
@@ -79,17 +100,19 @@ let translate program =
   in
 
   (* return llvalue for a expr for inline init (function call and assign not supported)*)
-  let rec expr_val g_vars ((sty, e) : sexpr) = match e with
+  let rec expr_val g_vars ((ty, e) : sexpr) = match e with
         SLiteral i  -> L.const_int i32_t i
       | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFliteral l -> L.const_float_of_string float_t l
       | SCharLit ch -> L.const_int i8_t (Char.code ch)
       | SStrLit str -> L.define_global str (L.const_stringz context str) the_module 
-      | SArrVal arr -> getArrVal g_vars sty arr
+      | SArrVal arr -> let arrval =  List.map (expr_val g_vars) arr in
+        L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
+      | SSlice(_) -> raise(Failure "internal error: slice not supported")
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> lookup_global g_vars s
       | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
-      | SBinop (((A.Float,(-1,-1,-1)),_ ) as e1, op, e2) ->
+      | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr_val g_vars e1
     and e2' = expr_val g_vars e2 in
     (match op with 
@@ -128,27 +151,10 @@ let translate program =
       | SUnop(op, ((t, _) as e)) ->
           let e' = expr_val g_vars e in
     (match op with
-      A.Neg when t = (A.Float,(-1,-1,-1)) -> L.const_fneg 
+      A.Neg when t = A.Float -> L.const_fneg 
     | A.Neg                  -> L.const_neg
     | A.Not                  -> L.const_not) e'
       | SCall (_, _) -> raise(Failure ("internal error:function call should be rejected by semantic check"))
-  and getArrVal g_vars (t, d) arr3 = match d with
-    | (-1,-1,_) ->
-      let arr1 = List.hd (List.hd arr3) in 
-      helper1 g_vars arr1
-    | (-1,_,_) ->
-      let arr2 = List.hd arr3 in
-      let arrval = List.map (helper1 g_vars) arr2 in
-      L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
-    | (_,_,_) ->
-      let arrval = List.map (helper2 g_vars) arr3 in
-      L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
-  and helper1 g_vars arr1d =
-    let arrval = List.map (expr_val g_vars) arr1d in (* sexpr list -> llvalue list *)
-    L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
-  and helper2 g_vars arr2d =
-    let arrval = List.map (helper1 g_vars) arr2d in (* sexpr list list -> llvalue list list *)
-    L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
   in
 
 
@@ -162,19 +168,17 @@ let translate program =
 
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
-    let global_var m (t, n, _, e) =
-      let (_, tmp) = e in
+    let global_var m (t, n, e) =
+      let (rt, tmp) = e in
       let e' = expr_val m e in
       let init = match tmp,t with
-          SNoexpr,A.(Float,(-1,-1,-1)) -> L.const_float (ltype_of_typ t) 0.0
-        | SNoexpr,(A.Int,(-1,-1,-1)) | SNoexpr,(A.Bool,(-1,-1,-1)) -> L.const_int (ltype_of_typ t) 0
-        | SNoexpr,(A.Char,(-1,-1,-1)) -> L.const_int (ltype_of_typ t) 0
-        | SNoexpr,(A.String,(-1,-1,-1)) -> L.const_pointer_null string_t
+          SNoexpr,A.Float -> L.const_float (ltype_of_typ t) 0.0
+        | SNoexpr,A.Int | SNoexpr,A.Bool -> L.const_int (ltype_of_typ t) 0
+        | SNoexpr,A.Char-> L.const_int (ltype_of_typ t) 0
+        | SNoexpr,A.String -> L.const_pointer_null string_t
         | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
-        | _,(A.String,(-1,-1,-1)) -> L.const_bitcast e' string_t
-        | SArrVal(_),(A.Int,(-1,-1,_)) -> L.const_bitcast e' array1_i32_t
-        | SArrVal(_),(A.Int,(-1,_,_)) -> L.const_bitcast e' array2_i32_t
-        | SArrVal(_),(A.Int,(_,_,_)) -> L.const_bitcast e' array3_i32_t
+        | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
+        | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
         | _,_ -> e'
       in 
       StringMap.add n (L.define_global n init the_module) m 
@@ -203,10 +207,10 @@ let translate program =
   in
 
   let ty_to_format (ty, _) = match ty with
-    | A.Int,(-1,-1,-1) | A.Bool,(-1,-1,-1) -> int_format_str
-    | A.Float,(-1,-1,-1) -> float_format_str
-    | A.Char,(-1,-1,-1) -> char_format_str
-    | A.String,(-1,-1,-1) -> string_format_str
+    | A.Int | A.Bool -> int_format_str
+    | A.Float -> float_format_str
+    | A.Char -> char_format_str
+    | A.String -> string_format_str
     | _ -> int_format_str (* Should be rejected before *)
   in
   
@@ -216,7 +220,7 @@ let translate program =
     let builder = L.builder_at_end context (L.entry_block the_function) in
 
     let formal_vars : L.llvalue StringMap.t =
-      let add_formal m (t, n, _, _) p =
+      let add_formal m (t, n, _) p =
         L.set_value_name n p;
         let local = L.build_alloca (ltype_of_typ t) n builder in
           ignore (L.build_store p local builder);
@@ -238,12 +242,14 @@ let translate program =
       | SFliteral l -> L.const_float_of_string float_t l
       | SCharLit ch -> L.const_int i8_t (Char.code ch)
       | SStrLit str -> L.build_global_stringptr str "str" builder
-      | SArrVal arr -> raise(Failure("Array no support"))
+      | SArrVal arr -> let arrval =  List.map (expr_val g_vars) arr in
+        L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
+      | SSlice(_) -> raise(Failure "internal error: slice not supported")
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
-      | SBinop (((A.Float,(-1,-1,-1)),_ ) as e1, op, e2) ->
+      | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
     and e2' = expr (local_vars, builder) e2 in
     (match op with 
@@ -282,7 +288,7 @@ let translate program =
       | SUnop(op, ((t, _) as e)) ->
           let e' = expr (local_vars, builder) e in
     (match op with
-      A.Neg when t = (A.Float,(-1,-1,-1)) -> L.build_fneg 
+      A.Neg when t = A.Float -> L.build_fneg 
     | A.Neg                  -> L.build_neg
     | A.Not                  -> L.build_not) e' "tmp" builder
       | SCall ("print", [e]) ->
@@ -294,7 +300,7 @@ let translate program =
          let (fdef, fdecl) = StringMap.find f function_decls in
    let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in
    let result = (match fdecl.styp with 
-                        A.Void,(-1,-1,-1) -> ""
+                        A.Void -> ""
                       | _ -> f ^ "_result") in
          L.build_call fdef (Array.of_list llargs) result builder
     in
@@ -318,7 +324,7 @@ let translate program =
       | SExpr e -> ignore(expr (local_vars, builder) e); (local_vars, builder)
       | SReturn e -> ignore(match fdecl.styp with
                               (* Special "return nothing" instr *)
-                              A.Void,(-1,-1,-1) -> L.build_ret_void builder 
+                              A.Void -> L.build_ret_void builder 
                               (* Build return statement *)
                             | _ -> L.build_ret (expr (local_vars, builder) e) builder );
                      (local_vars, builder)
@@ -358,7 +364,7 @@ let translate program =
       ( SBlock [SStmt(SExpr e1) ; SStmt(SWhile (e2, SBlock [SStmt(body) ; SStmt(SExpr e3)])) ] )
 
 
-    and add_local (local_vars , builder) (t, n, _, e) =
+    and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in
       let () = match tmp with
@@ -377,8 +383,8 @@ let translate program =
 
     (* Add a return if the last block falls off the end *)
     add_terminal (formal_vars, builder) (match fdecl.styp with
-        A.Void,(-1,-1,-1) -> L.build_ret_void
-      | A.Float,(-1,-1,-1) -> L.build_ret (L.const_float float_t 0.0)
+        A.Void -> L.build_ret_void
+      | A.Float -> L.build_ret (L.const_float float_t 0.0)
       | t -> L.build_ret (L.const_int (ltype_of_typ t) 0))
   in
 

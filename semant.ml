@@ -53,6 +53,30 @@ let check program =
       (Array(ty, List.length sarr), SArrVal(sarr))
   in
 
+  let rec array_dim n = function
+    | Array(t, _) -> array_dim (n+1) t
+    | _ -> n
+  in
+
+  let slice_helper1 range slicing n = match slicing with
+    | (-1,-1) -> (range, (0, range-1))
+    | (-1,a) when a < range && a > -1 -> (a + 1, (0, a)) 
+    | (a,-1) when a < range && a > -1 -> (range - a, (a, range-1))
+    | (a,b) when a < range && a > -1 && a < range && a > -1 && a <= b -> (b - a + 1, (a,b))
+    | _ -> raise(Failure("illegal slicing at " ^ n))
+  in
+
+  let check_slice vars n l =
+    let ty = type_of_identifier vars n in
+    match ty,(List.length l) with
+      | Mat(a,b),_ -> raise(Failure("Mat does not have slicing"))
+      | Img(a,b,c),_ -> raise(Failure("Img does not have slicing"))
+      | Array(t,d),1 when (array_dim 0 ty) = 1 ->
+        let (new_dim, new_slice) = slice_helper1 d (List.hd l) n in
+        if new_dim = 1 then (t, SSlice(n,[new_slice])) else(Array(t,new_dim), SSlice(n,[new_slice]))
+      | _ -> raise(Failure("no support for this slicing"))
+  in
+
   let rec check_arr3 (v,f) arr3 =
     let sarr3 = List.map (check_arr2 (v,f)) arr3 in
     check_list_type sarr3
@@ -77,6 +101,7 @@ let check program =
     | BoolLit l  -> (Bool, SBoolLit l)
     | Noexpr     -> (Void, SNoexpr)
     | Id s       -> (type_of_identifier var_symbols s, SId s)
+    | Slice(n, l) -> check_slice var_symbols n l
     | Assign(var, e) as ex -> 
         let lt = type_of_identifier var_symbols var
         and (rt, e') = check_expr (var_symbols, func_symbols) e in
