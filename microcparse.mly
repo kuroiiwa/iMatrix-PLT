@@ -81,11 +81,11 @@ fdecl_bodyless:
    body = [] }}
 
 fdecl:
-  typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
-   { { typ = $1;
-  fname = $2;
-  formals = List.rev $4;
-  body = List.rev $7 }}
+   typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
+     { { typ = $1;
+	 fname = $2;
+	 formals = List.rev $4;
+	 body = List.rev $7 }}
 
 formals_opt:
     /* nothing */ { [] }
@@ -141,7 +141,7 @@ expr_opt:
 
 expr:
     LITERAL          { Literal($1)            }
-  | FLIT             { Fliteral($1)           }
+  | FLIT	           { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
@@ -232,3 +232,5 @@ arr_ele:
   | NOT arr_ele         { Unop(Not, $2)          }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  } /* might need to be forbidden */
   | LPAREN arr_ele RPAREN { $2                   }  
+
+
