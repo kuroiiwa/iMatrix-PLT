@@ -45,7 +45,7 @@ let translate program =
 
 
   (* array type and dimension helper function *)
-  let rec arr_type_helper t =
+  let arr_type_helper t =
     let rec get_dim n = function
       | A.Array(t, _) -> get_dim (n+1) t
       | _ -> n
@@ -100,17 +100,19 @@ let translate program =
   in
 
   (* return llvalue for a expr for inline init (function call and assign not supported)*)
-  let rec expr_val g_vars ((ty, e) : sexpr) = match e with
+  let rec expr_val g_vars ((_, e) : sexpr) = match e with
         SLiteral i  -> L.const_int i32_t i
       | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFliteral l -> L.const_float_of_string float_t l
       | SCharLit ch -> L.const_int i8_t (Char.code ch)
       | SStrLit str -> L.define_global str (L.const_stringz context str) the_module 
-      | SArrVal arr -> let arrval =  List.map (expr_val g_vars) arr in
-        L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
+      | SArrVal arr ->
+        let (ty_ele, _) = List.hd arr in
+        let arrval = List.map (expr_val g_vars) arr in
+        L.define_global "tmp" (L.const_array (ltype_of_typ ty_ele) (Array.of_list arrval)) the_module
       | SSlice(_) -> raise(Failure "internal error: slice not supported")
       | SNoexpr     -> L.const_int i32_t 0
-      | SId s       -> lookup_global g_vars s
+      | SId s       -> L.global_initializer (lookup_global g_vars s)
       | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr_val g_vars e1
@@ -169,7 +171,7 @@ let translate program =
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
     let global_var m (t, n, e) =
-      let (rt, tmp) = e in
+      let (_, tmp) = e in
       let e' = expr_val m e in
       let init = match tmp,t with
           SNoexpr,A.Float -> L.const_float (ltype_of_typ t) 0.0
@@ -236,14 +238,25 @@ let translate program =
     in
 
     (* Construct code for an expression; return its value *)
-    let rec expr (local_vars, builder) ((_, e) : sexpr) = match e with
+    let rec expr (local_vars, builder) ((ty, e) : sexpr) = match e with
         SLiteral i  -> L.const_int i32_t i
       | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFliteral l -> L.const_float_of_string float_t l
       | SCharLit ch -> L.const_int i8_t (Char.code ch)
       | SStrLit str -> L.build_global_stringptr str "str" builder
-      | SArrVal arr -> let arrval =  List.map (expr_val g_vars) arr in
-        L.define_global "tmp" (L.const_vector (Array.of_list arrval)) the_module
+      | SArrVal arr ->
+        (* build the array element by element, might be optimized *)
+        let arr_helper builder ty_ele ptr lvalue =
+          let ptr_tmp = L.build_bitcast ptr (L.pointer_type (ltype_of_typ ty_ele)) "tmp" builder in
+          ignore(L.build_store lvalue ptr_tmp builder);
+          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "tmp" builder
+        in
+        let (ty_ele, _) = List.hd arr in
+        let arrval = List.map (expr (local_vars,builder)) arr in
+        let tmp = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "tmp" builder in
+        let ptr = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        ignore(List.fold_left (arr_helper builder ty_ele) ptr arrval);
+        L.build_bitcast ptr (ltype_of_typ ty) "tmp" builder
       | SSlice(_) -> raise(Failure "internal error: slice not supported")
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
@@ -370,7 +383,7 @@ let translate program =
       let () = match tmp with
         | SNoexpr -> ()
         | SStrLit str -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
-        | _ -> let e' = expr_val local_vars e in ignore(L.build_store e' local_var builder); ()
+        | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
       in
       (StringMap.add n local_var local_vars, builder)
 
@@ -389,4 +402,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
+  ignore(L.dump_module the_module);
   the_module

@@ -245,11 +245,11 @@ let check program =
   check_global_dup program;
 
   (**** check if declaration is void type and if expr is legal ****)
-  let check_dcl (var_symbols, func_symbols) (ty, n, e) =
+  let check_dcl (var_symbols, func_symbols) (ty, n, e) isGlobal =
     match ty,e with
       | Void,_ -> raise(Failure ("illegal void " ^ n))
       | _,Assign _ -> raise(Failure ("assign in init not supported"))
-      | _,Call _ -> raise(Failure ("calling funciton in init not supported"))
+      | _,Call _ when isGlobal -> raise(Failure ("calling funciton initializer in global not supported"))
       | _ -> ();
     match e with
       | Noexpr -> (ty, n, (Void, SNoexpr))
@@ -321,7 +321,7 @@ let check program =
         SBlock(List.rev lst)
     (* go through func_body line by line here*)
     and check_body_ele (var_symbols, func_symbols, body_sast) = function
-      | Dcl((_, id, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+      | Dcl((_, id, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d false in
       let (t,_,_) = dcl in
       ((StringMap.add id t var_symbols), func_symbols, SDcl(dcl) :: body_sast)
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
@@ -370,13 +370,13 @@ let check program =
     SFunc{
       styp = funct.typ;
       sfname = funct.fname;
-      sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d in dcl :: l) [] funct.formals);
+      sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d false in dcl :: l) [] funct.formals);
       sbody = List.rev lst }
   in
 
 (*   make funtion visible to itself : recursion  *)
   let check_prog_ele (var_symbols, func_symbols, prog_sast) = function
-    | Globaldcl((_, id, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d in
+    | Globaldcl((_, id, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d true in
       let (t,_,_) = dcl in
     ((StringMap.add id t var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func func_symbols f in
