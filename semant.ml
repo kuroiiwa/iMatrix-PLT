@@ -73,9 +73,9 @@ let check program =
     let get_trd var = List.hd (List.tl (List.tl var)) in
 
     let rec catch_typ = function
-      | Array(content, d) -> (match content with
-        | Array(cont, _) -> (catch_typ cont)
-        | _ -> content) in
+      | Array(content, _) -> catch_typ content
+      | _ as t -> t
+    in
     
     match typ with
     (* the input is a legal slice *)
@@ -86,10 +86,11 @@ let check program =
     | Array(cont,_) -> 
       (match cont with
         | Array(cont2,_) -> (match cont2 with
-          |Array(_) -> (Array(Array(Array(catch_typ typ, fst (get_fst var)), fst (get_snd var)), fst (get_trd var)),
+          |Array(_) -> (Array(Array(Array(catch_typ typ, fst (get_trd var)), fst (get_snd var)), fst (get_fst var)),
             SSlice(name, [snd (get_fst var); snd (get_snd var); snd (get_trd var)]))
-          | _ -> (Array(Array(catch_typ typ, fst (get_fst var)), fst (get_snd var)), SSlice(name, [snd (get_fst var); snd (get_snd var)])))
+          | _ -> (Array(Array(catch_typ typ, fst (get_snd var)), fst (get_fst var)), SSlice(name, [snd (get_fst var); snd (get_snd var)])))
         | _ -> (Array(catch_typ typ, fst (get_fst var)), SSlice(name, [snd (get_fst var)])))
+    | _ -> raise(Failure("internal error: slice type match failed"))
   in
 
   let slice_helper1 n range slicing = match slicing with
