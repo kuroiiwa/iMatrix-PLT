@@ -248,8 +248,9 @@ let check program =
   let check_dcl (var_symbols, func_symbols) (ty, n, e) isGlobal =
     match ty,e with
       | Void,_ -> raise(Failure ("illegal void " ^ n))
-      | _,Assign _ -> raise(Failure ("assign in init not supported"))
-      | _,Call _ when isGlobal -> raise(Failure ("calling funciton initializer in global not supported"))
+      | _,Assign _ -> raise(Failure ("assign in init not allowed"))
+      | _,Call _ when isGlobal -> raise(Failure ("calling funciton initializer in global not allowed"))
+      | _,Slice _ when isGlobal -> raise(Failure ("slicing initializer in global not allowed"))
       | _ -> ();
     match e with
       | Noexpr -> (ty, n, (Void, SNoexpr))

@@ -110,7 +110,7 @@ let translate program =
         let (ty_ele, _) = List.hd arr in
         let arrval = List.map (expr_val g_vars) arr in
         L.define_global "tmp" (L.const_array (ltype_of_typ ty_ele) (Array.of_list arrval)) the_module
-      | SSlice(_) -> raise(Failure "internal error: slice not supported")
+      | SSlice(_) -> raise (Failure "internal error: semant should have rejected slicing in init")
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.global_initializer (lookup_global g_vars s)
       | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
@@ -237,6 +237,87 @@ let translate program =
                    with Not_found -> StringMap.find n global_vars
     in
 
+    let rec copy_eles res des n builder =
+      if n = 0 then ()
+      else (
+        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
+        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let ele = L.build_load res "tmp" builder in
+        ignore(L.build_store ele des builder);
+        copy_eles new_res new_des (n-1) builder) 
+    in
+
+
+    (* BUG HERE *)
+    let deref builder (des,prev) (a,b) =
+      if a = b && prev then (L.build_load des "tmp" builder, true)
+      else (des, false)
+    in
+
+    let rec copy_slice_helper2 res des n index_l builder =
+      if n = 0 then ()
+      else (
+        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
+        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let tmp_orig = L.build_load res "tmp" builder in
+        let slice = copy_slice tmp_orig ([List.nth index_l 1]) builder false in
+        ignore(L.build_store slice des builder);
+        copy_slice_helper2 new_res new_des (n-1) index_l builder
+      )
+
+    and copy_slice_helper3 res des n index_l builder =
+      if n = 0 then ()
+      else (
+        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
+        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let tmp_orig = L.build_load res "tmp" builder in
+        let slice = copy_slice tmp_orig (List.tl index_l) builder false in
+        ignore(L.build_store slice des builder);
+        copy_slice_helper3 new_res new_des (n-1) index_l builder
+      ) 
+
+    and copy_slice orig index_l builder down = match (List.length index_l) with
+      | 1 -> (
+        let (a,b) = List.hd index_l in
+        let len = b - a + 1 in
+        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+
+        let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in  
+        let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
+        ignore(copy_eles res des len builder);
+        if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
+        else des
+      )
+      | 2 -> (
+        let (a,b) = List.hd index_l in
+        let len = b - a + 1 in
+        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+
+        let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
+        let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
+        ignore(copy_slice_helper2 res des len index_l builder);
+        if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
+        else des
+      )
+      | 3 -> (
+        let (a,b) = List.hd index_l in
+        let len = b - a + 1 in
+        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+
+        let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
+        let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        let des = L.build_bitcast des_tmp (L.type_of res) "3dtmp" builder in
+        ignore(copy_slice_helper3 res des len index_l builder);
+        if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
+        else des
+      )
+      | _ -> raise (Failure "internal error: slicing list shoule not be empty")
+    in
+
+
+
     (* Construct code for an expression; return its value *)
     let rec expr (local_vars, builder) ((ty, e) : sexpr) = match e with
         SLiteral i  -> L.const_int i32_t i
@@ -246,18 +327,20 @@ let translate program =
       | SStrLit str -> L.build_global_stringptr str "str" builder
       | SArrVal arr ->
         (* build the array element by element, might be optimized *)
-        let arr_helper builder ty_ele ptr lvalue =
-          let ptr_tmp = L.build_bitcast ptr (L.pointer_type (ltype_of_typ ty_ele)) "tmp" builder in
-          ignore(L.build_store lvalue ptr_tmp builder);
+        let arr_helper builder ptr lvalue =
+          ignore(L.build_store lvalue ptr builder);
           L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "tmp" builder
         in
         let (ty_ele, _) = List.hd arr in
         let arrval = List.map (expr (local_vars,builder)) arr in
         let tmp = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "tmp" builder in
-        let ptr = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
-        ignore(List.fold_left (arr_helper builder ty_ele) ptr arrval);
-        L.build_bitcast ptr (ltype_of_typ ty) "tmp" builder
-      | SSlice(_) -> raise(Failure "internal error: slice not supported")
+        let ptr_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        let ptr = L.build_bitcast ptr_tmp (ltype_of_typ ty) "tmp" builder in
+        ignore(List.fold_left (arr_helper builder) ptr arrval);
+        ptr
+      | SSlice(d, index_l) ->
+        let orig = L.build_load (lookup local_vars d) d builder in
+        copy_slice orig index_l builder true
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in

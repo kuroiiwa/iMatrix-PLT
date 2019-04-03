@@ -226,6 +226,7 @@ arr_ele:
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
   | ID               { Id($1)                 }
+  | ID slice_opt        { Slice($1, $2)    }
   | arr_ele PLUS   arr_ele { Binop($1, Add,   $3)   }
   | arr_ele MINUS  arr_ele { Binop($1, Sub,   $3)   }
   | arr_ele TIMES  arr_ele { Binop($1, Mult,  $3)   }
