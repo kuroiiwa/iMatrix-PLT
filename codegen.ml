@@ -73,7 +73,9 @@ let translate program =
             | A.Float,1 -> array1_float_t
             | A.Float,2 -> array2_float_t
             | A.Float,3 -> array3_float_t
-            | _ -> raise(Failure("internal error with dimension")))
+            | _ -> raise(Failure("internal error with dimension"))) 
+    | A.Mat(_) -> array2_float_t
+    | A.Img(_) -> array3_i32_t
     | _ -> raise(Failure("type not supported"))
   in
 
@@ -181,6 +183,7 @@ let translate program =
         | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
+        | _,A.Mat(_) | _,A.Img(_) -> L.const_bitcast e' (ltype_of_typ t)
         | _,_ -> e'
       in 
       StringMap.add n (L.define_global n init the_module) m 
@@ -248,7 +251,6 @@ let translate program =
     in
 
 
-    (* BUG HERE *)
     let deref builder (des,prev) (a,b) =
       if a = b && prev then (L.build_load des "tmp" builder, true)
       else (des, false)
