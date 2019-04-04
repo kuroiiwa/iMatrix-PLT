@@ -76,7 +76,7 @@ let translate program =
             | _ -> raise(Failure("internal error with dimension"))) 
     | A.Mat(_) -> array2_float_t
     | A.Img(_) -> array3_i32_t
-    | _ -> raise(Failure("type not supported"))
+(*     | _ -> raise(Failure("type not supported")) *)
   in
 
   let pick_func lst = function
@@ -116,6 +116,7 @@ let translate program =
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.global_initializer (lookup_global g_vars s)
       | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
+      | SSliceAssign (_) -> raise (Failure "internal error: semant should have rejected assign in init")
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr_val g_vars e1
     and e2' = expr_val g_vars e2 in
@@ -199,6 +200,16 @@ let translate program =
       L.function_type i32_t [| i32_t |] in
   let printbig_func : L.llvalue =
       L.declare_function "printbig" printbig_t the_module in
+
+  let __setIntArray_t : L.lltype =
+      L.function_type i32_t [| array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
+  let __setIntArray_func : L.llvalue =
+      L.declare_function "__setIntArray" __setIntArray_t the_module in
+
+  let __setFloArray_t : L.lltype =
+      L.function_type i32_t [| array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
+  let __setFloArray_func : L.llvalue =
+      L.declare_function "__setFloArray" __setFloArray_t the_module in
 
 
   let int_format_str = L.const_bitcast 
@@ -347,6 +358,35 @@ let translate program =
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
+      | SSliceAssign (v, lst, e) -> 
+        let create_ptr c builder =
+          let tmp = L.build_alloca (L.type_of c) "tmp" builder in
+          ignore(L.build_store c tmp builder);
+          tmp
+        in
+
+        let res_tmp = expr (local_vars, builder) e in
+        let res = if L.is_constant res_tmp then create_ptr res_tmp builder
+          else res_tmp in
+        let depth = List.length lst in
+        let des = L.build_load (lookup local_vars v) v builder in
+
+        let flatten_l = List.rev (List.fold_left (fun l (a,b) -> (A.Int, SLiteral(b)) :: (A.Int, SLiteral(a)) :: l) [] lst) in
+        let arrval = L.const_array i32_t (Array.of_list (List.map (expr_val local_vars) flatten_l)) in
+        let tmp = L.build_alloca (L.array_type i32_t (List.length flatten_l)) "tmp" builder in
+        let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
+        ignore(L.build_store arrval tmp builder);
+        let (ty, _) = arr_type_helper ty in
+        (match ty with
+          | A.Int ->
+            let res' = L.build_bitcast res array3_i32_t "res" builder
+            and des' = L.build_bitcast des array3_i32_t "des" builder in
+            L.build_call __setIntArray_func [| des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
+          | A.Float -> 
+            let res' = L.build_bitcast res array3_float_t "res" builder
+            and des' = L.build_bitcast des array3_float_t "des" builder in
+            L.build_call __setFloArray_func [| des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
+          | _ as t -> raise(Failure(A.string_of_typ t ^ " type does not support slicing copy")))
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
     and e2' = expr (local_vars, builder) e2 in

@@ -168,6 +168,16 @@ let check program =
         let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
           string_of_typ rt ^ " in " ^ string_of_expr ex
         in (check_assign lt rt err, SAssign(var, (rt, e')))
+    | SliceAssign(var, lst, e) as ex ->
+      let (lt, le) = check_expr (var_symbols, func_symbols) (Slice(var, lst))
+      and (rt, re) = check_expr (var_symbols, func_symbols) e in
+      let slice_list = (match le with
+        | SSlice(_, l) -> l
+        | _ -> raise(Failure("internal error: slicing assign should be a valid slicing")))
+      in
+      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+          string_of_typ rt ^ " in " ^ string_of_expr ex
+      in (check_assign lt rt err, SSliceAssign(var, slice_list, (rt, re)))
     | Unop(op, e) as ex -> 
         let (t, e') = check_expr (var_symbols, func_symbols) e in
         let ty = match op with
@@ -264,14 +274,14 @@ let check program =
 
   (**** Collect all built-in functions at first ****)
   let built_in_decls = 
-    let add_bind map (name, ty) = StringMap.add name {
-      typ = Void;
+    let add_bind map (fty, name, ty) = StringMap.add name {
+      typ = fty;
       fname = name; 
       formals = [(ty, "x", Noexpr)];
       body = [] } map
     in List.fold_left add_bind StringMap.empty [
-                               ("printbig", Int);
-                               ("print", Int) ]
+                               (Void, "printbig", Int);
+                               (Void, "print", Int)]
   in
 
   (**** Add func to func_symbols with error handler ****)

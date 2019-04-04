@@ -31,6 +31,7 @@ and expr =
  (* | Getattr of string * string *)
   | Unop of uop * expr
   | Assign of string * expr
+  | SliceAssign of string * ((int * int) list) * expr
   | Call of string * expr list
   | Noexpr
 
@@ -105,7 +106,9 @@ let rec string_of_expr = function
       e1 ^ "." ^ e2 *)
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
-  | Call(f, el) ->
+  | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_int a ^ ":" ^ string_of_int b ^ "]") lst)
+    ^ " = " ^ string_of_expr e
+  | Call(f, el) -> 
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Noexpr -> ""
 and

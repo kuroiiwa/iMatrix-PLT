@@ -3,14 +3,14 @@
 
 int main() {
 
-	int a[] = [[1,2], [3,4], [5,6]];
-	int d[] = [a[0], a[1]];
+	float a[] = [[1.2,2.3], [3.2,4.5]];
 
-	print(d[0][0]);
-	print(d[0][1]);
+	a[1] = [5.2, 5.3];
 
-	print(d[1][0]);
-	print(d[1][1]);
+	print(a[0][0]);
+	print(a[0][1]);
+	print(a[1][0]);
+	print(a[1][1]);
 
 	return 0;
 }
