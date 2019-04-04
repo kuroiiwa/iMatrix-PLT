@@ -120,3 +120,60 @@ int __setFloArray(double*** d, double*** r, int depth, int* s_info) {
 	}
 }
 
+void printIntArr(int*** arr, int x, int y, int z) {
+	if (y == 0 && z == 0) {
+		int* ptr = (void *)arr;
+		for (int i = 0; i < x; i++)
+			printf("%d  ", ptr[i]);
+		printf("\n");
+		return;
+	} else if (z == 0) {
+		int** ptr = (void*)arr;
+		for (int i = 0; i < x; i++) {
+			for(int j = 0; j < y; j++)
+				printf("%d  ", ptr[i][j]);
+			printf("\n");
+		}
+		printf("\n");
+	} else {
+		int*** ptr = arr;
+		for (int i = 0; i < x; i++) {
+			for (int j = 0; j < y; j++) {
+				for (int k = 0; k < z; k++)
+					printf("%d  ", ptr[i][j][k]);
+				printf("\n");
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+}
+
+void printFloatArr(double*** arr, int x, int y, int z) {
+	if (y == 0 && z == 0) {
+		double* ptr = (void *)arr;
+		for (int i = 0; i < x; i++)
+			printf("%f  ", ptr[i]);
+		printf("\n");
+		return;
+	} else if (z == 0) {
+		double** ptr = (void*)arr;
+		for (int i = 0; i < x; i++) {
+			for(int j = 0; j < y; j++)
+				printf("%f  ", ptr[i][j]);
+			printf("\n");
+		}
+		printf("\n");
+	} else {
+		double*** ptr = arr;
+		for (int i = 0; i < x; i++) {
+			for(int j = 0; j < y; j++) {
+				for (int k = 0; k < z; k++)
+					printf("%f  ", ptr[i][j][k]);
+				printf("\n");
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+}

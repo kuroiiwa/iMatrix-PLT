@@ -211,6 +211,16 @@ let translate program =
   let __setFloArray_func : L.llvalue =
       L.declare_function "__setFloArray" __setFloArray_t the_module in
 
+  let printIntArr_t : L.lltype =
+      L.function_type i32_t [| array3_i32_t ; i32_t ; i32_t ; i32_t |] in
+  let printIntArr_func : L.llvalue =
+      L.declare_function "printIntArr" printIntArr_t the_module in
+
+  let printFloatArr_t : L.lltype =
+      L.function_type i32_t [| array3_float_t ; i32_t ; i32_t ; i32_t |] in
+  let printFloatArr_func : L.llvalue =
+      L.declare_function "printFloatArr" printFloatArr_t the_module in
+
 
   let int_format_str = L.const_bitcast 
   (L.define_global "fmt" (L.const_stringz context "%d\n") the_module) string_t
@@ -244,6 +254,24 @@ let translate program =
       in
     List.fold_left2 add_formal StringMap.empty fdecl.sformals
           (Array.to_list (L.params the_function))
+    in
+
+    let rec extDim_helper l = function
+      | A.Array(t, d) -> extDim_helper (d :: l) t
+      | _ -> l
+    in
+
+    let extDim = function
+      | A.Array(_) as ty ->
+        let l = List.rev (extDim_helper [] ty) in
+        (match List.length l with
+          | 1 -> [|List.hd l ; 0 ; 0|]
+          | 2 -> [|List.nth l 0 ;  List.nth l 1 ; 0 |]
+          | 3 -> [|List.nth l 0 ;  List.nth l 1 ; List.nth l 2 |]
+          | _ -> raise(Failure("internal error: extract dimension for zero dimension")))
+      | A.Mat(x,y) -> [|x ; y ; 0|]
+      | A.Img(x,y,z) -> [|x ; y ; z|]
+      | _ -> raise(Failure("internal error: extract dimension for non array type"))
     in
 
 
@@ -434,6 +462,20 @@ let translate program =
         "printf" builder
       | SCall ("printbig", [e]) ->
     L.build_call printbig_func [| (expr (local_vars, builder) e) |] "printbig" builder
+      | SCall ("printIntArr", [e]) ->
+        let e' = expr (local_vars, builder) e in
+        let (t,_) = e in
+        let ar = extDim t in
+        let des = L.build_bitcast e' array3_i32_t "tmp" builder in
+        L.build_call printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+        "printIntArr" builder
+      | SCall ("printFloatArr", [e]) ->
+        let e' = expr (local_vars, builder) e in
+        let (t,_) = e in
+        let ar = extDim t in
+        let des = L.build_bitcast e' array3_float_t "tmp" builder in
+        L.build_call printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+        "printFloatArr" builder
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
    let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in

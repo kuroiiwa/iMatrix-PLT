@@ -5,12 +5,16 @@ int main() {
 
 	float a[] = [[1.2,2.3], [3.2,4.5]];
 
-	a[1] = [5.2, 5.3];
+	mat c[] = [a[0][:]];
 
-	print(a[0][0]);
-	print(a[0][1]);
-	print(a[1][0]);
-	print(a[1][1]);
+	int b[] = [[1,2,3,4], [5,6,7,8]];
 
+	img d[] = [b,b];
+
+	printFloatArr(a);
+	printFloatArr(c);
+
+	printIntArr(b);
+	printIntArr(d);
 	return 0;
 }

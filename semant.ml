@@ -206,6 +206,16 @@ let check program =
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
         in (ty, SBinop((t1, e1'), op, (t2, e2')))
     | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
+    | Call("printFloatArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
+      (match ty with
+        | Array(_) as arr_t when get_type_arr arr_t = Float -> (Void, SCall("printFloatArr", [(ty,e')]))
+        | Mat(_) -> (Void, SCall("printFloatArr", [(ty,e')]))
+        | _ -> raise(Failure("illegal argument in printFloatArr")))
+    | Call("printIntArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
+      (match ty with
+        | Array(_) as arr_t when get_type_arr arr_t = Int -> (Void, SCall("printIntArr", [(ty,e')]))
+        | Img(_) -> (Void, SCall("printIntArr", [(ty,e')]))
+        | _ -> raise(Failure("illegal argument in printIntArr")))
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in
@@ -281,7 +291,9 @@ let check program =
       body = [] } map
     in List.fold_left add_bind StringMap.empty [
                                (Void, "printbig", Int);
-                               (Void, "print", Int)]
+                               (Void, "print", Int);
+                               (Void, "printFloatArr", Array(Float, 1));
+                               (Void, "printIntArr", Array(Int, 1))]
   in
 
   (**** Add func to func_symbols with error handler ****)
