@@ -167,6 +167,7 @@ void printFloatArr(double*** start, int row, int col, int layer) {
 		}
 		printf("]");
 	}
+	printf("\n");
 }
 
 void printIntArr(int*** start, int row, int col, int layer) {
@@ -215,6 +216,7 @@ void printIntArr(int*** start, int row, int col, int layer) {
 		}
 		printf("]");
 	}
+	printf("\n");
 }
 
 void printCharArr(char*** start, int row, int col, int layer) {
@@ -263,6 +265,7 @@ void printCharArr(char*** start, int row, int col, int layer) {
 		}
 		printf("]");
 	}
+	printf("\n");
 }
 
 void matMul(double** A, double** B, double** C, int dim1, int dim2, int dim3) {

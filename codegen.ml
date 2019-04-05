@@ -34,13 +34,16 @@ let translate program =
   and void_t     = L.void_type   context in
 
   let string_t   = L.pointer_type i8_t
+  and array1_i8_t   = L.pointer_type i8_t
   and array1_i32_t   = L.pointer_type i32_t
   and array1_float_t = L.pointer_type float_t in
 
-  let array2_i32_t   = L.pointer_type array1_i32_t 
+  let array2_i8_t   = L.pointer_type array1_i8_t
+  and array2_i32_t   = L.pointer_type array1_i32_t 
   and array2_float_t = L.pointer_type array1_float_t in
 
-  let array3_i32_t   = L.pointer_type array2_i32_t 
+  let array3_i8_t   = L.pointer_type array2_i8_t 
+  and array3_i32_t   = L.pointer_type array2_i32_t 
   and array3_float_t = L.pointer_type array2_float_t in
 
 
@@ -67,6 +70,9 @@ let translate program =
     | A.String -> string_t
     | A.Array(_) as t -> let (ty, dim) = arr_type_helper t in
           (match ty,dim with
+            | A.Char,1 ->  array1_i8_t
+            | A.Char,2 ->  array2_i8_t
+            | A.Char,3 ->  array3_i8_t
             | A.Int,1 ->  array1_i32_t
             | A.Int,2 ->  array2_i32_t
             | A.Int,3 ->  array3_i32_t
@@ -220,6 +226,11 @@ let translate program =
       L.function_type i32_t [| array3_float_t ; i32_t ; i32_t ; i32_t |] in
   let printFloatArr_func : L.llvalue =
       L.declare_function "printFloatArr" printFloatArr_t the_module in
+  
+  let printCharArr_t : L.lltype =
+      L.function_type i8_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
+  let printCharArr_func : L.llvalue =
+      L.declare_function "printCharArr" printCharArr_t the_module in
 
 
   let int_format_str = L.const_bitcast 
@@ -469,6 +480,13 @@ let translate program =
         let des = L.build_bitcast e' array3_i32_t "tmp" builder in
         L.build_call printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
         "printIntArr" builder
+      | SCall ("printCharArr", [e]) ->
+        let e' = expr (local_vars, builder) e in
+        let (t,_) = e in
+        let ar = extDim t in
+        let des = L.build_bitcast e' array3_i8_t "tmp" builder in
+        L.build_call printCharArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+        "printCharArr" builder
       | SCall ("printFloatArr", [e]) ->
         let e' = expr (local_vars, builder) e in
         let (t,_) = e in
