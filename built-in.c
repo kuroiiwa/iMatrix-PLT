@@ -120,60 +120,231 @@ int __setFloArray(double*** d, double*** r, int depth, int* s_info) {
 	}
 }
 
-void printIntArr(int*** arr, int x, int y, int z) {
-	if (y == 0 && z == 0) {
-		int* ptr = (void *)arr;
-		for (int i = 0; i < x; i++)
-			printf("%d  ", ptr[i]);
-		printf("\n");
-		return;
-	} else if (z == 0) {
-		int** ptr = (void*)arr;
-		for (int i = 0; i < x; i++) {
-			for(int j = 0; j < y; j++)
-				printf("%d  ", ptr[i][j]);
-			printf("\n");
+void printFloatArr(double*** start, int row, int col, int layer) {
+	
+	if (layer == 0 && col == 0) {
+		double* start = (void*) start;
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("%lf\t", start[i]);
 		}
-		printf("\n");
-	} else {
-		int*** ptr = arr;
-		for (int i = 0; i < x; i++) {
-			for (int j = 0; j < y; j++) {
-				for (int k = 0; k < z; k++)
-					printf("%d  ", ptr[i][j][k]);
-				printf("\n");
+		printf("]\n");
+	}
+	
+	else if (layer == 0) {
+		printf("[");
+		double** ptr = (void*) start;
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("%lf\t", ptr[i][j]);
 			}
-			printf("\n");
+			if (i != row - 1)
+				printf("]\n");
+			else
+				printf("]");
 		}
-		printf("\n");
+		printf("]");
+	}
+	else {
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("[");
+				for (int k = 0; k < layer; k++) {
+					printf("%lf\t", start[i][j][k]);
+				}
+				if (j != col - 1)
+					printf("]\n");
+				else
+					printf("]");
+			}
+			if (i != row - 1)
+				printf("]\n");
+			else 
+				printf("]");
+		}
+		printf("]");
 	}
 }
 
-void printFloatArr(double*** arr, int x, int y, int z) {
-	if (y == 0 && z == 0) {
-		double* ptr = (void *)arr;
-		for (int i = 0; i < x; i++)
-			printf("%f  ", ptr[i]);
-		printf("\n");
-		return;
-	} else if (z == 0) {
-		double** ptr = (void*)arr;
-		for (int i = 0; i < x; i++) {
-			for(int j = 0; j < y; j++)
-				printf("%f  ", ptr[i][j]);
-			printf("\n");
+void printIntArr(int*** start, int row, int col, int layer) {
+	if (layer == 0 && col == 0) {
+		int* start = (void*) start;
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("%d\t", start[i]);
 		}
-		printf("\n");
-	} else {
-		double*** ptr = arr;
-		for (int i = 0; i < x; i++) {
-			for(int j = 0; j < y; j++) {
-				for (int k = 0; k < z; k++)
-					printf("%f  ", ptr[i][j][k]);
-				printf("\n");
+		printf("]\n");
+	}
+	
+	else if (layer == 0) {
+		printf("[");
+		int** ptr = (void*) start;
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("%d\t", ptr[i][j]);
 			}
-			printf("\n");
+			if (i != row - 1)
+				printf("]\n");
+			else
+				printf("]");
 		}
-		printf("\n");
+		printf("]");
+	}
+	else {
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("[");
+				for (int k = 0; k < layer; k++) {
+					printf("%d\t", start[i][j][k]);
+				}
+				if (j != col - 1)
+					printf("]\n");
+				else
+					printf("]");
+			}
+			if (i != row - 1)
+				printf("]\n");
+			else 
+				printf("]");
+		}
+		printf("]");
+	}
+}
+
+void printCharArr(char*** start, int row, int col, int layer) {
+	if (layer == 0 && col == 0) {
+		char* start = (void*) start;
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("%c\t", start[i]);
+		}
+		printf("]\n");
+	}
+	
+	else if (layer == 0) {
+		printf("[");
+		char** ptr = (void*) start;
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("%c\t", ptr[i][j]);
+			}
+			if (i != row - 1)
+				printf("]\n");
+			else
+				printf("]");
+		}
+		printf("]");
+	}
+	else {
+		printf("[");
+		for (int i = 0; i < row; i++) {
+			printf("[");
+			for (int j = 0; j < col; j++) {
+				printf("[");
+				for (int k = 0; k < layer; k++) {
+					printf("%c\t", start[i][j][k]);
+				}
+				if (j != col - 1)
+					printf("]\n");
+				else
+					printf("]");
+			}
+			if (i != row - 1)
+				printf("]\n");
+			else 
+				printf("]");
+		}
+		printf("]");
+	}
+}
+
+void matMul(double** A, double** B, double** C, int dim1, int dim2, int dim3) {
+	/* 
+	A(dim1, dim2) and B(dim2, dim3) are input matrices,
+	C(dim2, dim3) are output matrix
+	*/
+
+	for (int i = 0; i < dim1; i++) {
+		for (int j = 0; j < dim3; j++) {
+			// C[i][j] = A[i][:] .* B[:][j]
+			C[i][j] = 0;
+			for (int k = 0; k < dim2; k++)
+				C[i][j] += A[i][k] + B[k][j];
+		}
+	}
+}
+
+void aveFilter(int*** imgIn, int*** imgOut, int row, int col, int layer, int fWidth) {
+	/*
+	Input a imgIn(row, col, layer), implement average filter of
+	 a radius of fWidth. The output is imgOut.
+
+	e.g. filter width = 1, then we use 3 x 3 filter
+	     filter width = 2, then we use 5 x 5 filter
+	*/
+
+	
+	for (int i = 0; i < row; i++) {
+		for (int j = 0; j < col; j++) {
+			for (int k = 0; k < layer; k++) {
+				/* for each pixel in each channel, do average */
+				int count = 0;
+				int sum = 0;
+				for (int m = -fWidth; m <= fWidth; m++) {
+					for (int n = -fWidth; n <= fWidth; n++) {
+						if (i + m >= 0 && i + m < row - 1
+							&& j + n >= 0 && j + n < col - 1) {
+							count++;
+							sum += imgIn[i + m][j + n][k];
+						}
+					}
+				}
+				int aveResult = sum / count;
+				imgOut[i][j][k] = aveResult;
+			}
+		}
+	}
+	
+}
+
+void edgeDetection(int*** imgIn, int*** imgOut, int row, int col, int layer, int threshold) {
+	/*
+	use 3 x 3 filter for edge detection
+	*/
+	#define abs(x) x > 0? x: -x
+	for (int i = 0; i < row; i++) {
+		for (int j = 0; j < col; j++) {
+			/* for the edge of the input image, we simply ignore them */
+			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
+				for (int k = 0; k < layer; k++)
+					imgOut[i][j][k] = 0;
+			}
+			/* else, we compute the gradients and judge if it is edge */
+			else {
+				int gradSum = 0; // total gradients
+				for (int k = 0; k < layer; k++) {
+					gradSum += abs(8 * imgIn[i][j][k] 
+							- imgIn[i - 1][j - 1][k] - imgIn[i - 1][j][k] - imgIn[i - 1][j + 1][k]
+							- imgIn[i][j - 1][k] - imgIn[i][j + 1][k]
+							- imgIn[i + 1][j - 1][k] - imgIn[i + 1][j][k] - imgIn[i + 1][j + 1][k]);
+				}
+				gradSum /= layer;
+				if (gradSum >= threshold) {
+					for (int k = 0; k < layer; k++)
+						imgOut[i][j][k] = imgIn[i][j][k];
+				}
+				else {
+					for (int k = 0; k < layer; k++)
+						imgOut[i][j][k] = 0;
+				}
+			}
+		}
 	}
 }
