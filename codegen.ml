@@ -282,8 +282,8 @@ let translate program =
     let rec copy_eles res des n builder =
       if n = 0 then ()
       else (
-        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
-        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let ele = L.build_load res "tmp" builder in
         ignore(L.build_store ele des builder);
         copy_eles new_res new_des (n-1) builder) 
@@ -298,8 +298,8 @@ let translate program =
     let rec copy_slice_helper2 res des n index_l builder =
       if n = 0 then ()
       else (
-        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
-        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let tmp_orig = L.build_load res "tmp" builder in
         let slice = copy_slice tmp_orig ([List.nth index_l 1]) builder false in
         ignore(L.build_store slice des builder);
@@ -309,8 +309,8 @@ let translate program =
     and copy_slice_helper3 res des n index_l builder =
       if n = 0 then ()
       else (
-        let new_res = L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder
-        and new_des = L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let tmp_orig = L.build_load res "tmp" builder in
         let slice = copy_slice tmp_orig (List.tl index_l) builder false in
         ignore(L.build_store slice des builder);
