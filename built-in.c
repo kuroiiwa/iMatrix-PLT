@@ -116,10 +116,10 @@ int __setFloArray(int diff, double*** d, double*** r, int depth, int* s_info) {
 void printFloatArr(double*** start, int row, int col, int layer) {
 	
 	if (layer == 0 && col == 0) {
-		double* start = (void*) start;
+		double* ptr = (void*) start;
 		printf("[");
 		for (int i = 0; i < row; i++) {
-			printf("%lf\t", start[i]);
+			printf("%lf\t", ptr[i]);
 		}
 		printf("]\n");
 	}
@@ -165,10 +165,10 @@ void printFloatArr(double*** start, int row, int col, int layer) {
 
 void printIntArr(int*** start, int row, int col, int layer) {
 	if (layer == 0 && col == 0) {
-		int* start = (void*) start;
+		int* ptr = (void*) start;
 		printf("[");
 		for (int i = 0; i < row; i++) {
-			printf("%d\t", start[i]);
+			printf("%d\t", ptr[i]);
 		}
 		printf("]\n");
 	}
@@ -214,10 +214,10 @@ void printIntArr(int*** start, int row, int col, int layer) {
 
 void printCharArr(char*** start, int row, int col, int layer) {
 	if (layer == 0 && col == 0) {
-		char* start = (void*) start;
+		char* ptr = (void*) start;
 		printf("[");
 		for (int i = 0; i < row; i++) {
-			printf("%c\t", start[i]);
+			printf("%c\t", ptr[i]);
 		}
 		printf("]\n");
 	}
