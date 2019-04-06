@@ -16,23 +16,25 @@ int main() {
 	//float arrF[] =  [[[1.,2.,3.,4.],[5.,6.,7.,8.],[9.,10.,
 	//		11.,12.]],[[13.,14.,15.,16.],[17.,18.,19.,20.],[21.,22.,23.,24.]]];
 	char arrC[] = [['a','b','c'],['d','e','f']];
+
+	mat m1[] = [[1.,2.],[3.,4.],[5.,6.]]; // 3 x 2
+	mat m2[] = [[7.,8.],[9.,10.]]; // 2 x 2
+	mat m3[3,2];
+	matMul(m1,m2,m3);
+	
 	a = 110;
 	b = 2.0;
 	c = true;
 	d = 'd';
 	e = "e";
 
+	
+
 	printIntArr(arrI);
 	printFloatArr(arrF);
 	printCharArr(arrC);
-	//printbig(a);
-	//show(79); /* O */
-  	//show(32); /*   */
-	//print(b);
-	//print(c);
-	//printbig(5);
-	//show(d);
-	//print(e);
+	printFloatArr(m3);
+
 
 
 	return 0;

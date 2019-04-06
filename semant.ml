@@ -219,7 +219,26 @@ let check program =
     | Call("printCharArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
       (match ty with
         | Array(_) as arr_t when get_type_arr arr_t = Char -> (Void, SCall("printCharArr", [(ty,e')]))
-        | _ -> raise(Failure("illegal argument in printCharArr")))
+        | _ -> raise(Failure("illegal argument in printIntArr")))
+    | Call("matMul", [e1;e2;e3]) -> 
+      let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
+      let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
+      let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
+      let check_typ_helper = function Mat(_) -> () 
+        | _ -> raise(Failure("matrix multiplication should only support mat type")) in
+      let check_dim_helper ty1 ty2 ty3 = 
+        let dim_1 = function Mat(f,_) -> f | _ -> raise(Failure("internel error: helper function should get mat as input"))in 
+        let dim_2 = function Mat(_,s) -> s | _ -> raise(Failure("internel error: helper function should get mat as input"))in 
+        if dim_1 ty1 <> dim_1 ty3 then raise (Failure("dimension unmatched in matrix multiplication")) 
+        else (if dim_2 ty1 <> dim_1 ty2 then raise (Failure("dimension unmatched in matrix multiplication"))
+          else(if dim_2 ty2 <> dim_2 ty3 then raise (Failure("dimension unmatched in matrix multiplication"))
+               else ()))
+      in
+      ignore(check_typ_helper ty1);
+      ignore(check_typ_helper ty2);
+      ignore(check_typ_helper ty3);
+      ignore( check_dim_helper ty1 ty2 ty3);
+      (Void, SCall("matMul", [(ty1,e1');(ty2,e2');(ty3,e3')]))
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in

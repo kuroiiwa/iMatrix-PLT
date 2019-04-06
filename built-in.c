@@ -273,13 +273,11 @@ void matMul(double** A, double** B, double** C, int dim1, int dim2, int dim3) {
 	A(dim1, dim2) and B(dim2, dim3) are input matrices,
 	C(dim2, dim3) are output matrix
 	*/
-
 	for (int i = 0; i < dim1; i++) {
 		for (int j = 0; j < dim3; j++) {
-			// C[i][j] = A[i][:] .* B[:][j]
-			C[i][j] = 0;
+			/* C[i][j] = A[i][:] .* B[:][j] */
 			for (int k = 0; k < dim2; k++)
-				C[i][j] += A[i][k] + B[k][j];
+				C[i][j] += A[i][k] * B[k][j];
 		}
 	}
 }

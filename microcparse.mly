@@ -3,14 +3,35 @@
 %{
 open Ast
 
+let rec build_empty_arr_helper ele ls time = match time with
+  | 0 -> ls 
+  | _ -> build_empty_arr_helper ele (ls @ ele) (time - 1)
+
+let build_empty_arr typ dim = 
+  let get_ele t = (match t with 
+    | Float -> [Fliteral("0.0")]
+    | Int -> [Literal(0)]
+    | Bool -> [BoolLit(false)]
+    | Char -> [CharLit('a')] 
+    | _ -> raise(Failure("internel error: parser build_empty_arr function"))) in
+  let (a,b,c) = dim in
+  let ele1 = get_ele typ in
+  match (a,b,c) with
+  | (0,0,c) -> Arr1Val(build_empty_arr_helper ele1 [] c)
+  | (0,b,c) -> let ele2 = build_empty_arr_helper ele1 [] c in
+               Arr2Val(build_empty_arr_helper [ele2] [ele2] (b - 1))
+  | (a,b,c) -> let ele2 = build_empty_arr_helper ele1 [] c in
+               let ele3 = build_empty_arr_helper [ele2] [ele2] (b - 1) in
+               Arr3Val(build_empty_arr_helper [ele3] [ele3] (a - 1))
+
 let bind_arr_dcl_noexpr t id dim = match t,dim with
   | _,(0,0,0) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, Noexpr)
-  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, Noexpr)
+  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, build_empty_arr Float dim)
+  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, build_empty_arr Int dim)
   | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
-  | _,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
-  | _,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
-  | _,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
+  | t,(0,0,a) when a > 0 -> (Array(t,a), id, build_empty_arr t dim)
+  | t,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, build_empty_arr t dim)
+  | t,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, build_empty_arr t dim)
   | _ -> raise(Failure("dimension error"))
 
 let bind_arr_dcl_expr t id dim e = match t,dim with

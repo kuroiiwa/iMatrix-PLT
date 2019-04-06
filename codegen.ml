@@ -228,9 +228,15 @@ let translate program =
       L.declare_function "printFloatArr" printFloatArr_t the_module in
   
   let printCharArr_t : L.lltype =
-      L.function_type i8_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
+      L.function_type i32_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
   let printCharArr_func : L.llvalue =
       L.declare_function "printCharArr" printCharArr_t the_module in
+
+  let matMul_t : L.lltype = 
+      L.function_type i32_t [| array2_float_t ; array2_float_t ; array2_float_t;
+                               i32_t ; i32_t ; i32_t|] in
+  let matMul_func: L.llvalue = 
+      L.declare_function "matMul" matMul_t the_module in
 
 
   let int_format_str = L.const_bitcast 
@@ -284,7 +290,6 @@ let translate program =
       | A.Img(x,y,z) -> [|x ; y ; z|]
       | _ -> raise(Failure("internal error: extract dimension for non array type"))
     in
-
 
     let lookup m n = try StringMap.find n m
                    with Not_found -> StringMap.find n global_vars
@@ -494,6 +499,17 @@ let translate program =
         let des = L.build_bitcast e' array3_float_t "tmp" builder in
         L.build_call printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
         "printFloatArr" builder
+      | SCall ("matMul", [e1;e2;e3]) ->
+        let e1' = expr (local_vars, builder) e1 in
+        let e2' = expr (local_vars, builder) e2 in
+        let e3' = expr (local_vars, builder) e3 in
+        let (t1,_) = e1 in let (t2,_) = e2 in 
+        let ar1 = extDim t1 in let ar2 = extDim t2 in
+        let des1 = L.build_bitcast e1' array2_float_t "tmp" builder in
+        let des2 = L.build_bitcast e2' array2_float_t "tmp" builder in
+        let des3 = L.build_bitcast e3' array2_float_t "tmp" builder in
+        L.build_call matMul_func [| des1; des2; des3; 
+          L.const_int i32_t ar1.(0); L.const_int i32_t ar1.(1); L.const_int i32_t ar2.(1) |] "matMul" builder
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
    let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in
