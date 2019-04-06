@@ -319,7 +319,7 @@ void edgeDetection(int*** imgIn, int*** imgOut, int row, int col, int layer, int
 	/*
 	use 3 x 3 filter for edge detection
 	*/
-	#define abs(x) x > 0? x: -x
+	//printf("%d\n",threshold);
 	for (int i = 0; i < row; i++) {
 		for (int j = 0; j < col; j++) {
 			/* for the edge of the input image, we simply ignore them */
@@ -329,13 +329,14 @@ void edgeDetection(int*** imgIn, int*** imgOut, int row, int col, int layer, int
 			}
 			/* else, we compute the gradients and judge if it is edge */
 			else {
-				int gradSum = 0; // total gradients
+				float gradSum = 0; // total gradients
 				for (int k = 0; k < layer; k++) {
 					gradSum += abs(8 * imgIn[i][j][k] 
 							- imgIn[i - 1][j - 1][k] - imgIn[i - 1][j][k] - imgIn[i - 1][j + 1][k]
 							- imgIn[i][j - 1][k] - imgIn[i][j + 1][k]
 							- imgIn[i + 1][j - 1][k] - imgIn[i + 1][j][k] - imgIn[i + 1][j + 1][k]);
 				}
+				//printf("%f\n",gradSum);
 				gradSum /= layer;
 				if (gradSum >= threshold) {
 					for (int k = 0; k < layer; k++)
