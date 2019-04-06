@@ -1,11 +1,8 @@
 # Compiled Object Files
-*.o
+*.o *.a
 
 # Executables
 *.exe
 *.app
 
 *.native
-
-_build/
-printbig

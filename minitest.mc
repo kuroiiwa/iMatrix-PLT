@@ -4,17 +4,12 @@
 
 int main() {
 
-	mat a[] = [[1.,2.],[3.,4.]];
+	int b[] = [1,2,3,4,5];	char a[] = ['a', 'b', 'c'];
 
-	mat b[] = [[5.,6.], [7.,8.]];
-
-	float c[] = [[10.,11.], [11.,12.]];
-
-	float d[] = [c[:], c[:]];
+//	b = [2,3,4,5,6];
 
 
-	d[0][0] = c[1];
-
-	printFloatArr(d);
+	printCharArr(a);
+	printIntArr(b);
 	return 0;
 }

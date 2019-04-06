@@ -1,1 +1,1 @@
-Fatal error: exception Failure("calling funciton in init not supported")
+Fatal error: exception Failure("calling funciton initializer in global not allowed")
