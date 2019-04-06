@@ -218,6 +218,10 @@ let check program =
         | Array(_) as arr_t when get_type_arr arr_t = Int -> (Void, SCall("printIntArr", [(ty,e')]))
         | Img(_) -> (Void, SCall("printIntArr", [(ty,e')]))
         | _ -> raise(Failure("illegal argument in printIntArr")))
+    | Call("printCharArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
+      (match ty with
+        | Array(_) as arr_t when get_type_arr arr_t = Char -> (Void, SCall("printCharArr", [(ty,e')]))
+        | _ -> raise(Failure("illegal argument in printCharArr")))
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in
