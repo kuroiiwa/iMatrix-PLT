@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int __setIntArray(int*** d, int*** r, int depth, int* s_info) {
+int __setIntArray(int diff, int*** d, int*** r, int depth, int* s_info) {
 	if (depth == 1) {
 		int* des = (void *)d;
 		int* res = (void *)r;
@@ -13,27 +13,27 @@ int __setIntArray(int*** d, int*** r, int depth, int* s_info) {
 		return 0;
 	} else if (depth == 2) {
 		int** des = (void *)d;
+		int** res;
 
 		int s1 = s_info[0];
 		int len1 = s_info[1] - s_info[0] + 1;
 		int s2 = s_info[2];
 		int len2 = s_info[3] - s_info[2] + 1;
 
-		if (len1 == 1) {
-			int* res = (void *)r;
-			for (int i = 0; i < len2; i++)
-				des[s1][s2+i] = res[i];
-		} else {
-			int** res = (void *)r;
-			for (int i = 0; i < len1; i++)
-				for (int j = 0; j < len2; j++)
-					des[s1+i][s2+j] = res[i][j];
-		}
+		if (diff == 1)
+			res = (void *)&r;
+		else
+			res = (void *)r;
+
+		for (int i = 0; i < len1; i++)
+			for (int j = 0; j < len2; j++)
+				des[s1+i][s2+j] = res[i][j];
 
 		return 0;
 	} else if (depth == 3) {
 		int*** des = d;
-		int*** res = r;
+		int*** res;
+		void* tmp;
 
 		int s1 = s_info[0];
 		int len1 = s_info[1] - s_info[0] + 1;
@@ -42,25 +42,21 @@ int __setIntArray(int*** d, int*** r, int depth, int* s_info) {
 		int s3 = s_info[4];
 		int len3 = s_info[5] - s_info[4] + 1;
 
-		if (len1 == 1 && len2 == 1) {
-			int* res = (void *)r;
-			for (int i = 0; i < len3; i++)
-				des[s1][s2][s3+i] = res[i];
-		} else if (len1 == 1) {
-			int** res = (void *)r;
-			for (int i = 0; i < len2; i++)
-				for (int j = 0; j < len3; j++)
-					des[s1][s2+i][s3+j] = res[i][j];
-		} else {
-			for (int i = 0; i < len1; i++)
-				for (int j = 0; j < len2; j++)
-					for (int k = 0; k < len3; k++)
-						des[s1+i][s2+j][s3+k] = res[i][j][k];
-		}
+		if (diff == 2) {
+			tmp = (void *)&r;
+			res = (void *)&tmp;
+		} else if (diff == 1)
+			res = (void *)&r;
+		else
+			res = r;
+		for (int i = 0; i < len1; i++)
+			for (int j = 0; j < len2; j++)
+				for (int k = 0; k < len3; k++)
+					des[s1+i][s2+j][s3+k] = res[i][j][k];
 	}
 }
 
-int __setFloArray(double*** d, double*** r, int depth, int* s_info) {
+int __setFloArray(int diff, double*** d, double*** r, int depth, int* s_info) {
 	if (depth == 1) {
 		double* des = (void *)d;
 		double* res = (void *)r;
@@ -73,26 +69,26 @@ int __setFloArray(double*** d, double*** r, int depth, int* s_info) {
 		return 0;
 	} else if (depth == 2) {
 		double** des = (void *)d;
+		double** res;
 
 		int s1 = s_info[0];
 		int len1 = s_info[1] - s_info[0] + 1;
 		int s2 = s_info[2];
 		int len2 = s_info[3] - s_info[2] + 1;
 
-		if (len1 == 1) {
-			double* res = (void *)r;
-			for (int i = 0; i < len2; i++)
-				des[s1][s2+i] = res[i];
-		} else {
-			double** res = (void *)r;
-			for (int i = 0; i < len1; i++)
-				for (int j = 0; j < len2; j++)
-					des[s1+i][s2+j] = res[i][j];
-		}
+		if (diff == 1)
+			res = (void *)&r;
+		else
+			res = (void *)r;
+		for (int i = 0; i < len1; i++)
+			for (int j = 0; j < len2; j++)
+				des[s1+i][s2+j] = res[i][j];
 
 		return 0;
 	} else if (depth == 3) {
 		double*** des = d;
+		double*** res;
+		void* tmp;
 
 		int s1 = s_info[0];
 		int len1 = s_info[1] - s_info[0] + 1;
@@ -101,22 +97,19 @@ int __setFloArray(double*** d, double*** r, int depth, int* s_info) {
 		int s3 = s_info[4];
 		int len3 = s_info[5] - s_info[4] + 1;
 
-		if (len1 == 1 && len2 == 1) {
-			double* res = (void *)r;
-			for (int i = 0; i < len3; i++)
-				des[s1][s2][s3+i] = res[i];
-		} else if (len1 == 1) {
-			double** res = (void *)r;
-			for (int i = 0; i < len2; i++)
-				for (int j = 0; j < len3; j++)
-					des[s1][s2+i][s3+j] = res[i][j];
+		if (diff == 2) {
+			tmp = (void *)&r;
+			res = (void *)&tmp;
+		} else if (diff == 1) {
+			res = (void *)&r;
 		} else {
-			double*** res = r;
-			for (int i = 0; i < len1; i++)
-				for (int j = 0; j < len2; j++)
-					for (int k = 0; k < len3; k++)
-						des[s1+i][s2+j][s3+k] = res[i][j][k];
+			res = r;
 		}
+
+		for (int i = 0; i < len1; i++)
+			for (int j = 0; j < len2; j++)
+				for (int k = 0; k < len3; k++)
+					des[s1+i][s2+j][s3+k] = res[i][j][k];
 	}
 }
 

@@ -22,8 +22,10 @@ let check program =
   let check_assign lvaluet rvaluet err = match lvaluet,rvaluet with
     | Mat(0,0),Array(Array(Float,a),b) when a > 0 && b > 0 -> Mat(b,a)
     | Mat(a,b),Array(Array(Float,c),d) when a = d && b = c -> Mat(a,b)
+    | Mat(0,0),Mat(a,b) when a > 0 && b > 0 -> Mat(a,b)
     | Img(0,0,0),Array(Array(Array(Int,a),b),c) when a > 0 && b > 0 && c > 0 -> Img(c,b,a)
     | Img(d,e,f),Array(Array(Array(Int,a),b),c) when a = f && b = e && c = d -> Img(d,e,f)
+    | Img(0,0,0),Img(a,b,c) when a > 0 && b > 0 && c > 0 -> Img(a,b,c)
     | Array(t, 0),Array(_) -> let actual_ty = get_type_arr rvaluet in 
       if actual_ty = t then rvaluet else raise (Failure err)
     | _,_ -> if lvaluet = rvaluet then lvaluet else raise (Failure err)

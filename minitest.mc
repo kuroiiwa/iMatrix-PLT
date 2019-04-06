@@ -1,20 +1,20 @@
 
 //int b[] = init1[:][:];
 
+
 int main() {
 
-	float a[] = [[1.2,2.3], [3.2,4.5]];
+	mat a[] = [[1.,2.],[3.,4.]];
 
-	mat c[] = [a[0][:]];
+	mat b[] = [[5.,6.], [7.,8.]];
 
-	int b[] = [[1,2,3,4], [5,6,7,8]];
+	float c[] = [[10.,11.], [11.,12.]];
 
-	img d[] = [b,b];
+	float d[] = [c[:], c[:]];
 
-	printFloatArr(a);
-	printFloatArr(c);
 
-	printIntArr(b);
-	printIntArr(d);
+	d[0][0] = c[1];
+
+	printFloatArr(d);
 	return 0;
 }

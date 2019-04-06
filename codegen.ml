@@ -202,12 +202,12 @@ let translate program =
       L.declare_function "printbig" printbig_t the_module in
 
   let __setIntArray_t : L.lltype =
-      L.function_type i32_t [| array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
+      L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
   let __setIntArray_func : L.llvalue =
       L.declare_function "__setIntArray" __setIntArray_t the_module in
 
   let __setFloArray_t : L.lltype =
-      L.function_type i32_t [| array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
+      L.function_type i32_t [|i32_t; array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
   let __setFloArray_func : L.llvalue =
       L.declare_function "__setFloArray" __setFloArray_t the_module in
 
@@ -388,13 +388,28 @@ let translate program =
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
       | SSliceAssign (v, lst, e) -> 
         let create_ptr c builder =
-          let tmp = L.build_alloca (L.type_of c) "tmp" builder in
+          let tmp = L.build_alloca (L.type_of c) "tmpptr" builder in
           ignore(L.build_store c tmp builder);
           tmp
         in
 
+        let extDim1 = function
+          | A.Array(_) as arr -> let (_, n) = arr_type_helper arr in n
+          | A.Mat(1,_) -> 1
+          | A.Mat(_,_) -> 2
+          | A.Img(1,1,_) -> 1
+          | A.Img(1,_,_) -> 2
+          | A.Img(_,_,_) -> 3
+          | _ -> 1
+        in
+
+        let (t, _) = e in
+        let dimdiff = L.const_int i32_t ((List.length lst) - (extDim1 t)) in
+        let isComType = function
+          | A.Int | A.Float | A.Mat(1,1) | A.Img(1,1,1) -> true
+          | _ -> false in
         let res_tmp = expr (local_vars, builder) e in
-        let res = if L.is_constant res_tmp then create_ptr res_tmp builder
+        let res = if isComType t then create_ptr res_tmp builder
           else res_tmp in
         let depth = List.length lst in
         let des = L.build_load (lookup local_vars v) v builder in
@@ -406,14 +421,14 @@ let translate program =
         ignore(L.build_store arrval tmp builder);
         let (ty, _) = arr_type_helper ty in
         (match ty with
-          | A.Int ->
+          | A.Int | A.Img(_) ->
             let res' = L.build_bitcast res array3_i32_t "res" builder
             and des' = L.build_bitcast des array3_i32_t "des" builder in
-            L.build_call __setIntArray_func [| des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
-          | A.Float -> 
+            L.build_call __setIntArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
+          | A.Float | A.Mat(_) -> 
             let res' = L.build_bitcast res array3_float_t "res" builder
             and des' = L.build_bitcast des array3_float_t "des" builder in
-            L.build_call __setFloArray_func [| des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
+            L.build_call __setFloArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
           | _ as t -> raise(Failure(A.string_of_typ t ^ " type does not support slicing copy")))
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
