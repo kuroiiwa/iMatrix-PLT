@@ -25,13 +25,13 @@ and expr =
   | Arr1Val of arr1_val
   | Arr2Val of arr2_val
   | Arr3Val of arr3_val
-  | Slice of string * ((int * int) list)
+  | Slice of string * ((expr * expr) list)
   | Id of string
   | Binop of expr * op * expr
  (* | Getattr of string * string *)
   | Unop of uop * expr
   | Assign of string * expr
-  | SliceAssign of string * ((int * int) list) * expr
+  | SliceAssign of string * ((expr * expr) list) * expr
   | Call of string * expr list
   | Noexpr
 
@@ -96,7 +96,7 @@ let rec string_of_expr = function
   | Arr1Val(arr) -> string_of_1dmat arr
   | Arr2Val(arr) -> string_of_2dmat arr
   | Arr3Val(arr) -> string_of_arr arr
-  | Slice(n, lst) -> n ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_int a ^ ":" ^ string_of_int b ^ "]") lst)
+  | Slice(n, lst) -> n ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_expr a ^ ":" ^ string_of_expr b ^ "]") lst)
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
   | Id(s) -> s
@@ -106,7 +106,7 @@ let rec string_of_expr = function
       e1 ^ "." ^ e2 *)
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
-  | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_int a ^ ":" ^ string_of_int b ^ "]") lst)
+  | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_expr a ^ ":" ^ string_of_expr b ^ "]") lst)
     ^ " = " ^ string_of_expr e
   | Call(f, el) -> 
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
