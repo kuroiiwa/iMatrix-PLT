@@ -290,14 +290,14 @@ let translate program =
                    with Not_found -> StringMap.find n global_vars
     in
 
-    let rec copy_eles res des n builder =
+    let rec copy_eles res des n (vars, builder) =
       if n = 0 then ()
       else (
         let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
         and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let ele = L.build_load res "tmp" builder in
         ignore(L.build_store ele des builder);
-        copy_eles new_res new_des (n-1) builder) 
+        copy_eles new_res new_des (n-1) (vars, builder)) 
     in
 
 
@@ -306,72 +306,80 @@ let translate program =
       else (des, false)
     in
 
-    let rec copy_slice_helper2 res des n index_l builder =
+    let rec copy_slice_helper2 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
         let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
         and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let tmp_orig = L.build_load res "tmp" builder in
-        let slice = copy_slice tmp_orig ([List.nth index_l 1]) builder false in
+        let slice = copy_slice tmp_orig ([List.nth index_l 1]) (vars, builder) false in
         ignore(L.build_store slice des builder);
-        copy_slice_helper2 new_res new_des (n-1) index_l builder
+        copy_slice_helper2 new_res new_des (n-1) index_l (vars, builder)
       )
 
-    and copy_slice_helper3 res des n index_l builder =
+    and copy_slice_helper3 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
         let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
         and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
         let tmp_orig = L.build_load res "tmp" builder in
-        let slice = copy_slice tmp_orig (List.tl index_l) builder false in
+        let slice = copy_slice tmp_orig (List.tl index_l) (vars, builder) false in
         ignore(L.build_store slice des builder);
-        copy_slice_helper3 new_res new_des (n-1) index_l builder
+        copy_slice_helper3 new_res new_des (n-1) index_l (vars, builder)
       ) 
 
-    and copy_slice orig index_l builder down = match (List.length index_l) with
+    and copy_slice orig index_l (vars, builder) down = match (List.length index_l) with
       | 1 -> (
         let (a,b) = List.hd index_l in
-        let len = b - a + 1 in
-        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+        let len = match a,b with
+          | (_,SId(_)),(_,SId(_)) -> 1
+          | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1 
+          | _ -> raise(Failure("internal error: slicing has wrong type")) in
+        let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
 
         let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in  
         let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
         let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
-        ignore(copy_eles res des len builder);
+        ignore(copy_eles res des len (vars, builder));
         if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
         else des
       )
       | 2 -> (
         let (a,b) = List.hd index_l in
-        let len = b - a + 1 in
-        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+        let len = match a,b with
+          | (_,SId(_)),(_,SId(_)) -> 1
+          | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1
+          | _ -> raise(Failure("internal error: slicing has wrong type")) in
+        let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
 
         let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
         let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
         let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
-        ignore(copy_slice_helper2 res des len index_l builder);
+        ignore(copy_slice_helper2 res des len index_l (vars, builder));
         if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
         else des
       )
       | 3 -> (
         let (a,b) = List.hd index_l in
-        let len = b - a + 1 in
-        let res = L.build_in_bounds_gep orig [|L.const_int i32_t a|] "tmp" builder in
+        let len = match a,b with
+          | (_,SId(_)),(_,SId(_)) -> 1
+          | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1
+          | _ -> raise(Failure("internal error: slicing has wrong type")) in
+        let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
 
         let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
         let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
         let des = L.build_bitcast des_tmp (L.type_of res) "3dtmp" builder in
-        ignore(copy_slice_helper3 res des len index_l builder);
+        ignore(copy_slice_helper3 res des len index_l (vars, builder));
         if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
         else des
       )
       | _ -> raise (Failure "internal error: slicing list shoule not be empty")
-    in
 
 
 
     (* Construct code for an expression; return its value *)
-    let rec expr (local_vars, builder) ((ty, e) : sexpr) = match e with
+    and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
         SLiteral i  -> L.const_int i32_t i
       | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFliteral l -> L.const_float_of_string float_t l
@@ -392,12 +400,12 @@ let translate program =
         ptr
       | SSlice(d, index_l) ->
         let orig = L.build_load (lookup local_vars d) d builder in
-        copy_slice orig index_l builder true
+        copy_slice orig index_l (local_vars, builder) true
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
-      | SSliceAssign (v, lst, e) -> 
+      | SSliceAssign (v, lst, e) ->
         let create_ptr c builder =
           let tmp = L.build_alloca (L.type_of c) "tmpptr" builder in
           ignore(L.build_store c tmp builder);
@@ -425,11 +433,9 @@ let translate program =
         let depth = List.length lst in
         let des = L.build_load (lookup local_vars v) v builder in
 
-        let flatten_l = List.rev (List.fold_left (fun l (a,b) -> (A.Int, SLiteral(b)) :: (A.Int, SLiteral(a)) :: l) [] lst) in
-        let arrval = L.const_array i32_t (Array.of_list (List.map (expr_val local_vars) flatten_l)) in
-        let tmp = L.build_alloca (L.array_type i32_t (List.length flatten_l)) "tmp" builder in
+        let flatten_l = List.rev (List.fold_left (fun l (a,b) -> b :: a :: l) [] lst) in
+        let tmp = expr (local_vars, builder) (A.Array(A.Int, List.length flatten_l), SArrVal(flatten_l)) in
         let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
-        ignore(L.build_store arrval tmp builder);
         let (ty, _) = arr_type_helper ty in
         (match ty with
           | A.Int | A.Img(_) ->

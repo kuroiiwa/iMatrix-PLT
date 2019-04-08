@@ -193,11 +193,12 @@ slice_opt:
   | slice slice slice {$1 :: $2 :: [$3] }
 
 slice:
-  | LBRACK LITERAL RBRACK               { ($2, $2) }
-  | LBRACK LITERAL COLON LITERAL RBRACK { ($2, $4) }
-  | LBRACK COLON LITERAL RBRACK         { (-1, $3) }
-  | LBRACK LITERAL COLON RBRACK         { ($2, -1) }
-  | LBRACK COLON RBRACK                 { (-1, -1) }
+  | LBRACK ID RBRACK                    { (Id($2), Id($2)) }
+  | LBRACK LITERAL RBRACK               { (Literal($2), Literal($2)) }
+  | LBRACK LITERAL COLON LITERAL RBRACK { (Literal($2), Literal($4)) }
+  | LBRACK COLON LITERAL RBRACK         { (Literal(-1), Literal($3)) }
+  | LBRACK LITERAL COLON RBRACK         { (Literal($2), Literal(-1)) }
+  | LBRACK COLON RBRACK                 { (Literal(-1), Literal(-1)) }
 
 arr_3d:
   arr_3d_start RBRACK { List.rev $1 }

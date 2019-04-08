@@ -62,12 +62,12 @@ let check program =
 
   let expand_slice slice n = (* n <= 3 *)
       match (n, List.length slice) with
-      | (3,1) -> slice @ [(-1,-1)] @ [(-1,-1)]
-      | (3,2) | (2,1) -> slice @ [(-1,-1)]
+      | (3,1) -> slice @ [(Literal(-1),Literal(-1))] @ [(Literal(-1),Literal(-1))]
+      | (3,2) | (2,1) -> slice @ [(Literal(-1),Literal(-1))]
       | _ -> slice
   in
 
-  let slice_helper2 (var: ((int * (int * int)) list)) typ name = 
+  let slice_helper2 (var: ((int * (sexpr * sexpr)) list)) typ name = 
   (* given input arr/mat/img and input slice, output the range (how many number we will get 
      after slicing and new slice (deal with -1)) *)
     let get_fst var = List.hd var in
@@ -82,24 +82,28 @@ let check program =
     match typ with
     (* the input is a legal slice *)
     | Mat(_) -> (Mat(fst (get_fst var), fst (get_snd var)), 
-              SSlice(name, [snd (get_fst var); snd (get_snd var)]))
+              SSlice(name, List.map (fun (a,b) -> b) var))
     | Img(_) -> (Img(fst (get_fst var), fst (get_snd var), fst (get_trd var)),
-              SSlice(name, [snd (get_fst var); snd (get_snd var); snd (get_trd var)]))
+              SSlice(name, List.map (fun (a,b) -> b) var))
     | Array(cont,_) -> 
       (match cont with
         | Array(cont2,_) -> (match cont2 with
           |Array(_) -> (Array(Array(Array(catch_typ typ, fst (get_trd var)), fst (get_snd var)), fst (get_fst var)),
-            SSlice(name, [snd (get_fst var); snd (get_snd var); snd (get_trd var)]))
-          | _ -> (Array(Array(catch_typ typ, fst (get_snd var)), fst (get_fst var)), SSlice(name, [snd (get_fst var); snd (get_snd var)])))
-        | _ -> (Array(catch_typ typ, fst (get_fst var)), SSlice(name, [snd (get_fst var)])))
+            SSlice(name, List.map (fun (a,b) -> b) var))
+          | _ -> (Array(Array(catch_typ typ, fst (get_snd var)), fst (get_fst var)), SSlice(name, List.map (fun (a,b) -> b) var)))
+        | _ -> (Array(catch_typ typ, fst (get_fst var)), SSlice(name, List.map (fun (a,b) -> b) var)))
     | _ -> raise(Failure("internal error: slice type match failed"))
   in
 
-  let slice_helper1 n range slicing = match slicing with
-    | (-1,-1) -> (range, (0, range-1))
-    | (-1,a) when a < range && a > -1 -> (a + 1, (0, a)) 
-    | (a,-1) when a < range && a > -1 -> (range - a, (a, range-1))
-    | (a,b) when a < range && a > -1 && a < range && a > -1 && a <= b -> (b - a + 1, (a,b))
+  (*   generate Int * (sexpr * sexpr) list *)
+  let slice_helper1 n range (a',b') = 
+    let (_, e1) = a' and (_, e2) = b' in
+    match e1,e2 with
+    | SId(_),SId(_) -> (1, (a', b'))
+    | SLiteral(-1),SLiteral(-1) -> (range, ((Int, SLiteral(0)), (Int, SLiteral(range - 1))))
+    | SLiteral(-1),SLiteral(a) when a < range && a > -1 -> (a + 1, ((Int, SLiteral(0)), b'))
+    | SLiteral(a),SLiteral(-1) when a < range && a > -1 -> (range - a, (a', (Int, SLiteral(range - 1))))
+    | SLiteral(a),SLiteral(b) when a < range && a > -1 && a < range && a > -1 && a <= b -> (b - a + 1, (a', b'))
     | _ -> raise(Failure("illegal slicing at " ^ n))
   in
 
@@ -114,32 +118,37 @@ let check program =
     | _ as t -> t
   in
   
-  let check_slice vars n l =
+  let rec check_slice (vars, funcs) n l =
     let ty = type_of_identifier vars n in
+    let check_slice_expr (a,b) = 
+      let (t_a, e_a) as ex_a = check_expr (vars, funcs) a
+      and (t_b, e_b) as ex_b = check_expr (vars, funcs) b in
+      if t_a = Int && t_b = Int then (ex_a, ex_b)
+      else raise(Failure("illegal slicing"))
+    in
     match ty,(List.length l) with
 
       | Mat(a,b),_ -> 
-        let l' = expand_slice l 2 in
+        let l' = List.map check_slice_expr (expand_slice l 2) in
         let l_adjusted = [a; b] in
         let legal_slice = List.map2 (slice_helper1 n) l_adjusted l' in
         slice_helper2 legal_slice ty n
       | Img(a,b,c),_ ->
-        let l' = expand_slice l 3 in
+        let l' = List.map check_slice_expr (expand_slice l 3) in
         let l_adjusted = [a;b;c] in
         let legal_slice = List.map2 (slice_helper1 n) l_adjusted l' in
         slice_helper2 legal_slice ty n
       | Array(_),sn when (array_dim 0 ty) >= sn ->
         let actual_n = array_dim 0 ty in
-        let l' = expand_slice l actual_n in
+        let l' = List.map check_slice_expr (expand_slice l actual_n) in
         let l_adjusted = slice_helper3 [] ty in
         let legal_slice = List.map2 (slice_helper1 n) l_adjusted l' in
         let (new_ty, e) = slice_helper2 legal_slice ty n in
         let ty' = downgrade_dim new_ty in
         (ty', e)
       | _,_ -> raise(Failure("illegal slicing"))
-  in
 
-  let rec check_arr3 (v,f) arr3 =
+  and check_arr3 (v,f) arr3 =
     let sarr3 = List.map (check_arr2 (v,f)) arr3 in
     check_list_type sarr3
 
@@ -163,7 +172,7 @@ let check program =
     | BoolLit l  -> (Bool, SBoolLit l)
     | Noexpr     -> (Void, SNoexpr)
     | Id s       -> (type_of_identifier var_symbols s, SId s)
-    | Slice(n, l) -> check_slice var_symbols n l
+    | Slice(n, l) -> check_slice (var_symbols,func_symbols) n l
     | Assign(var, e) as ex -> 
         let lt = type_of_identifier var_symbols var
         and (rt, e') = check_expr (var_symbols, func_symbols) e in
