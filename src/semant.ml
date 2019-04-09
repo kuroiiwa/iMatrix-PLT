@@ -38,6 +38,14 @@ let check program =
     with Not_found -> raise (Failure ("undeclared identifier " ^ s))
   in
 
+  let check_struct_scope var_symbols n =
+     let ty = type_of_identifier var_symbols n in
+       (match ty with
+         | Struct(_) -> ()
+         | _ -> raise(Failure("struct not defined"))
+       )
+  in
+
   (* Return a function from our symbol table *)
   let find_func map s = 
     try StringMap.find s map
@@ -160,6 +168,31 @@ let check program =
     let sarr1 = List.map (check_expr (v,f)) arr1 in
     check_list_type sarr1
 
+
+   (*  check struct access expresion recursively*)
+  and check_struct_access (vars, funcs) e1 e2 =
+    let (lt, e1') = check_expr (vars, funcs) e1 in
+    let mem_list = match lt with
+      | Struct(n, l) -> l
+      | _ -> raise(Failure("accessing non struct type"))
+    in
+    let validTuple (a,b) = a = b in
+    match e2 with
+      | Id(s) when List.exists (fun (_,n) -> n = s) mem_list -> 
+        let (ty, _) = List.find (fun (_,n) -> n = s) mem_list in
+        (ty, SGetMember((lt,e1'), (ty,SId(s))) )
+      | Slice(s,l) when List.exists (fun (_,n) -> n = s) mem_list -> 
+        let (ty, name) = List.find (fun (_,n) -> n = s) mem_list in
+        (match ty with
+          | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) -> (ty, SGetMember((lt,e1'), (ty, SSlice(sn, [((Int, SLiteral(-1)), (Int, SLiteral(-1)))]))) )
+          | _ -> let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
+            (rt, SGetMember((lt, e1') ,(rt, re))))
+      | Id(s) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
+      | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
+      | _ -> raise(Failure("illegal expression in struct access at " ^ string_of_expr e1 ^ " " ^ string_of_expr e2))
+
+
+
   (**** Check expr including type and function call correctness ****)
   and check_expr (var_symbols, func_symbols) = function
       Literal  l -> (Int, SLiteral l)
@@ -172,7 +205,14 @@ let check program =
     | BoolLit l  -> (Bool, SBoolLit l)
     | Noexpr     -> (Void, SNoexpr)
     | Id s       -> (type_of_identifier var_symbols s, SId s)
+    | GetMember(e1, e2) -> check_struct_access (var_symbols, func_symbols) e1 e2
     | Slice(n, l) -> check_slice (var_symbols,func_symbols) n l
+    | StructAssign(e1, e2) as ex -> 
+        let (lt, le) = check_expr (var_symbols, func_symbols) e1
+        and (rt, e') = check_expr (var_symbols, func_symbols) e2 in
+        let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+          string_of_typ rt ^ " in " ^ string_of_expr ex
+        in (check_assign lt rt err, SStructAssign((lt, le), (rt, e')))
     | Assign(var, e) as ex -> 
         let lt = type_of_identifier var_symbols var
         and (rt, e') = check_expr (var_symbols, func_symbols) e in
@@ -262,6 +302,7 @@ let check program =
   let check_global_dup (prog : prog_element list) =
     let pick_binds lst = function
       | Globaldcl(dcl) -> dcl :: lst
+      | Struct_dcl(dcl) -> let n = dcl.name in (Int, n, Noexpr) :: lst
       | _ -> lst
     in
     let binds_list = List.fold_left pick_binds [] prog in
@@ -281,14 +322,24 @@ let check program =
 
   (**** check if declaration is void type and if expr is legal ****)
   let check_dcl (var_symbols, func_symbols) (ty, n, e) isGlobal =
-    match ty,e with
+    ignore(match ty,e with
       | Void,_ -> raise(Failure ("illegal void " ^ n))
       | _,Assign _ -> raise(Failure ("assign in init not allowed"))
       | _,Call _ when isGlobal -> raise(Failure ("calling funciton initializer in global not allowed"))
       | _,Slice _ when isGlobal -> raise(Failure ("slicing initializer in global not allowed"))
-      | _ -> ();
-    match e with
-      | Noexpr -> (ty, n, (Void, SNoexpr))
+      | Array(_) as arr,_ -> let t = get_type_arr arr in
+         (match t with
+           | Void -> raise(Failure ("illegal void " ^ n))
+           | Struct(n,_) -> ignore(check_struct_scope var_symbols n);
+             let dim = array_dim 0 arr in
+             if dim = 1 && e = Noexpr then () else raise(Failure (n ^ " struct array has initializer or has dimension more than 1"))
+           | _ -> ())
+      | Struct(n, _),_ -> ignore(check_struct_scope var_symbols n);
+         if e <> Noexpr then raise(Failure (n ^ " struct does not support initializer ")) else ()
+      | _ -> ());
+    match ty,e with
+      | Struct(name,_),Noexpr -> let t = type_of_identifier var_symbols name in (t, n, (Void, SNoexpr))
+      | _,Noexpr -> (ty, n, (Void, SNoexpr))
       | _ ->
     let (rt, e') = check_expr (var_symbols, func_symbols) e in
     let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^ 
@@ -408,8 +459,34 @@ let check program =
     SFunc{
       styp = funct.typ;
       sfname = funct.fname;
-      sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d false in dcl :: l) [] funct.formals);
+      sformals = List.rev (List.fold_left (fun l d -> let dcl = check_dcl (var_symbols, func_symbols) d true in dcl :: l) [] funct.formals);
       sbody = List.rev lst }
+  in
+
+(*   check struct members including scope and fix struct type members *)
+  let check_struct (var_symbols, _) struct_dcl =
+     check_binds_dup "struct_local" (List.map (fun (t,id) -> (t,id,Noexpr)) struct_dcl.member_list);
+
+      let check_struct_local = (function
+       | (Void, _) -> raise(Failure("void struct member in " ^ struct_dcl.name))
+       | (Struct(n,_) , nn) -> ignore(check_struct_scope var_symbols n); 
+        let ty = type_of_identifier var_symbols n in (ty,nn)
+       | (Array(_,d) as arr, n) -> let ty = get_type_arr arr in 
+         let arr_ty = (match ty with
+           | Void -> raise(Failure("void struct member in " ^ struct_dcl.name))
+           | Struct(name,_) -> ignore(check_struct_scope var_symbols name);
+             let dim = array_dim 0 arr in
+             if dim = 1 then type_of_identifier var_symbols name else raise(Failure (n ^ " struct array has dimension more than 1"))
+           | _ as t -> t
+         ) in (Array(arr_ty,d), n)
+       | (t, n) -> (t, n)
+(*        | (_, n) -> raise(Failure("illegal struct member definition at " ^ n ^ " in " ^ struct_dcl.name)) *))
+     in
+     let lst = List.map check_struct_local struct_dcl.member_list in 
+     ((struct_dcl.name, lst),SStruct_dcl{
+       sname = struct_dcl.name;
+       smember_list = lst;
+     })
   in
 
 (*   make funtion visible to itself : recursion  *)
@@ -421,6 +498,8 @@ let check program =
     (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
     | Func_dcl(f) -> let new_func_symbols = add_func func_symbols f in
     (var_symbols, new_func_symbols, prog_sast)
+    | Struct_dcl(dcl) -> let (ty, sdcl) = check_struct (var_symbols, func_symbols) dcl in
+     ((StringMap.add (fst ty) (Struct(ty)) var_symbols), func_symbols, sdcl :: prog_sast)
 
   in
 

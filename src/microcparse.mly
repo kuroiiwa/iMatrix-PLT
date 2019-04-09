@@ -38,7 +38,7 @@ let bind_dcl ty id e = match ty with
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
 %token IF ELSE FOR WHILE /* BREAK CONTINUE */ RETURN
-%token INT BOOL FLOAT CHAR STRING MAT IMG VOID /*STRUCT*/
+%token INT BOOL FLOAT CHAR STRING MAT IMG VOID STRUCT
 %token TRUE FALSE
 
 %token <int> LITERAL
@@ -60,6 +60,7 @@ let bind_dcl ty id e = match ty with
 %left PLUS MINUS                  /* precedence level: 11 */
 %left TIMES DIVIDE MODULO MATMUL POWER /* precedence level: 12 */
 %right NOT                        /* precedence level: 14 */
+%left DOT
 %nonassoc SELFPLUS SELFMINUS      /* precedence level: 15 */
 
 %%
@@ -72,6 +73,24 @@ decls:
  | decls vdecl { Globaldcl($2) :: $1 }
  | decls fdecl { Func($2) :: $1 }
  | decls fdecl_bodyless { Func_dcl($2) :: $1 }
+ | decls struct_dcl {Struct_dcl($2) :: $1 }
+
+ 
+struct_dcl:
+  STRUCT ID LBRACE struct_list RBRACE SEMI
+  {{
+    name = $2;
+    member_list = List.rev $4;
+  }}
+
+struct_list:
+  | struct_mem    { [$1] }
+  | struct_list struct_mem { $2 :: $1 }
+
+struct_mem:
+  | typ ID SEMI { let (t,id,_) = bind_dcl $1 $2 Noexpr in (t, id)}
+  | typ ID LBRACK dim_opt RBRACK SEMI { let (t,id,_) =  bind_arr_dcl_noexpr $1 $2 $4 in (t,id)}
+
 
 fdecl_bodyless:
   typ ID LPAREN formals_opt RPAREN SEMI
@@ -106,6 +125,7 @@ typ:
   | VOID  { Void  }
   | MAT   { Mat(0,0) }
   | IMG   { Img(0,0,0) }
+  | STRUCT ID { Struct($2, []) }
 
 func_body_list:
     /* nothing */ { [] }
@@ -152,7 +172,8 @@ expr:
   | arr_3d           { Arr3Val($1)           }
   | ID               { Id($1)                 }
   | ID slice_opt        { Slice($1, $2)    }
- /* | ID DOT ID        { Getattr ($1, $3)}    */    /* get attribute */
+  | struct_member_opt    { $1      }
+  | struct_member_opt ASSIGN expr { StructAssign($1, $3)}
   | expr PLUS   expr { Binop($1, Add,   $3)   }
   | expr MINUS  expr { Binop($1, Sub,   $3)   }
   | expr TIMES  expr { Binop($1, Mult,  $3)   }
@@ -178,6 +199,14 @@ expr:
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
+
+struct_member_opt:
+  | struct_member DOT struct_member     { GetMember($1, $3)      }
+  | struct_member_opt DOT struct_member { GetMember($1, $3)      }
+
+struct_member:
+  | ID             { Id($1)           }
+  | ID slice_opt   { Slice($1, $2)    }
 
 args_opt:
     /* nothing */ { [] }

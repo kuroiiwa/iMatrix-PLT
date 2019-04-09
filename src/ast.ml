@@ -6,14 +6,15 @@ type op = Add | Sub | Mult | Div | Mod | Pow | Equal | Neq | Less | Leq | Greate
 type uop = Neg | Not
 
 
-type typ = Int | Bool | Float | Char | String | Void | Mat of mat_type | Img of img_type | Array of arr_type
+type typ = Int | Bool | Float | Char | String | Void | Mat of mat_type | Img of img_type | Array of arr_type | Struct of struct_type
 
+and struct_type = string * ((typ * string) list)
 and mat_type = int * int
 and img_type = int * int * int
 and arr_type = typ * int
 
 
-type arr3_val = expr list list list
+and arr3_val = expr list list list
 and arr2_val = expr list list
 and arr1_val = expr list
 and expr =
@@ -27,6 +28,8 @@ and expr =
   | Arr3Val of arr3_val
   | Slice of string * ((expr * expr) list)
   | Id of string
+  | GetMember of expr * expr
+  | StructAssign of expr * expr
   | Binop of expr * op * expr
  (* | Getattr of string * string *)
   | Unop of uop * expr
@@ -36,9 +39,14 @@ and expr =
   | Noexpr
 
 
-type bind =  typ * string * expr
+and bind =  typ * string * expr
 
     (* Matrix -> failwith("should assign the size for matrix type") *)
+
+type struct_decl = {
+   name: string;
+   member_list: (typ * string) list;
+ }
 
 type stmt =
     Block of func_body list
@@ -59,6 +67,7 @@ type func_decl = {
 type prog_element = Globaldcl of bind
                   | Func of func_decl
                   | Func_dcl of func_decl
+                  | Struct_dcl of struct_decl
 
 type program = prog_element list
 
@@ -100,10 +109,10 @@ let rec string_of_expr = function
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
   | Id(s) -> s
-  | Binop(e1, o, e2) ->
+  | GetMember(e1, e2) -> string_of_expr e1 ^ "." ^ string_of_expr e2
+  | StructAssign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
+  | Binop(e1, o, e2) -> 
       string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
-(*  | Getattr(e1, e2) ->
-      e1 ^ "." ^ e2 *)
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
   | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_expr a ^ ":" ^ string_of_expr b ^ "]") lst)
@@ -131,6 +140,7 @@ and string_of_typ = function
   | Mat(a,b) -> "mat[" ^ string_of_int a ^ "," ^ string_of_int b ^ "]"
   | Img(a,b,c) -> "img[" ^ string_of_int a ^ "," ^ string_of_int b ^ "," ^ string_of_int c ^ "]"
   | Array(_, _) as arr -> string_of_dim "" arr 
+  | Struct(n,_) -> "struct " ^ n
 
 
 let string_of_combind (t, id, expr) = match expr with
@@ -171,11 +181,15 @@ let string_of_fdecl fdecl =
   String.concat "" (List.map string_of_func_body fdecl.body) ^
   "}\n" 
 
+let string_of_struct sdecl =
+   "struct " ^ sdecl.name ^ "{\n  " ^ String.concat "\n  " (List.map (fun (t,id) -> string_of_typ t ^ " " ^ id) sdecl.member_list) ^
+   "\n}\n"
 
 let string_of_program lst = 
   let helper str = function
   | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
   | Func(f) -> str ^ string_of_fdecl f
   | Func_dcl(f) -> str ^ string_of_fdecl f
+  | Struct_dcl(d) -> str ^ string_of_struct d
   in
   List.fold_left helper "" lst 

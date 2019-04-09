@@ -18,7 +18,7 @@ rule token = parse
 | ';'      { SEMI }                     (* split *)
 | ','      { COMMA }
 | ':'      { COLON }
-(*| '.'      { DOT } *)
+| '.'      { DOT } 
 | '+'      { PLUS }                     (* arithmatic *)
 | '-'      { MINUS }
 | '*'      { TIMES }
@@ -53,7 +53,7 @@ rule token = parse
 | "mat"    { MAT }
 | "img"    { IMG }
 | "void"   { VOID }
-(* | "struct" { STRUCT } *)
+| "struct" { STRUCT }
 | "true"   { BLIT(true)  }               (* bool *)
 | "false"  { BLIT(false) }
 | digits as lxm { LITERAL(int_of_string lxm) }  (* int *)

@@ -12,6 +12,8 @@ and sx =
   | SCharLit of char
   | SArrVal of sarr_val
   | SId of string
+  | SGetMember of sexpr * sexpr
+  | SStructAssign of sexpr * sexpr
   | SSlice of string * ((sexpr * sexpr) list)
   | SBinop of sexpr * op * sexpr
   | SUnop of uop * sexpr
@@ -39,8 +41,14 @@ type sfunc_decl = {
     sbody : sbody list;
   }
 
+type sstruct_decl = {
+   sname: string;
+   smember_list: (typ * string) list;
+ }
+
 type sprog_element = SGlobaldcl of sbind
                   | SFunc of sfunc_decl
+                  | SStruct_dcl of sstruct_decl
 
 type sprogram = sprog_element list
 
@@ -56,6 +64,8 @@ let rec string_of_sexpr (t, e) =
   | SArrVal(arr) -> "[" ^ String.concat ", " (List.map string_of_sexpr arr) ^ "]"
   | SCharLit(c) -> String.make 1 c
   | SId(s) -> s
+  | SGetMember(e1, e2) -> string_of_sexpr e1 ^ "." ^ string_of_sexpr e2
+  | SStructAssign(e1, e2) -> string_of_sexpr e1 ^ " = " ^ string_of_sexpr e2
   | SSlice(n, lst) -> n ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_sexpr a ^ ":" ^ string_of_sexpr b ^ "]") lst)
   | SBinop(e1, o, e2) ->
       string_of_sexpr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_sexpr e2
@@ -106,9 +116,14 @@ let string_of_sfdecl fdecl =
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"
 
+let string_of_sstruct sdecl = 
+     "struct " ^ sdecl.sname ^ "{\n  " ^ String.concat "\n  " (List.map (fun (t,id) -> string_of_typ t ^ " " ^ id) sdecl.smember_list) ^
+   "\n}\n"
+
 let string_of_sprogram lst =
   let helper str = function
     | SGlobaldcl(dcl) -> str ^ string_of_svdecl dcl
     | SFunc(f) -> str ^ string_of_sfdecl f
+    | SStruct_dcl(dcl) -> str ^ string_of_sstruct dcl
   in
   List.fold_left helper "" lst

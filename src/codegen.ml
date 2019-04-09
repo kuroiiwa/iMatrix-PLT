@@ -60,6 +60,50 @@ let translate program =
     (get_type_arr t, get_dim 0 t)
   in
 
+
+  let pick_struct lst = function
+    | SStruct_dcl(stru) -> stru :: lst
+    | _ -> lst
+  in
+  let structs = List.rev (List.fold_left pick_struct [] program) in
+
+
+  let struct_decls : (L.lltype * sstruct_decl) StringMap.t =
+    let struct_decl m sdecl =
+      let name = sdecl.sname in
+      let ltype_of_typ_opt (ty, _) = match ty with
+        | A.Struct(n, _) -> let (lty, _) = StringMap.find n m in lty
+        | A.Array(_) as t -> let (ty, dim) = arr_type_helper t in
+          (match ty,dim with
+            | A.Struct(n,_),1 -> let (lty,_) = StringMap.find n m in L.pointer_type lty
+            | A.Char,1 ->  array1_i8_t
+            | A.Char,2 ->  array2_i8_t
+            | A.Char,3 ->  array3_i8_t
+            | A.Int,1 ->  array1_i32_t
+            | A.Int,2 ->  array2_i32_t
+            | A.Int,3 ->  array3_i32_t
+            | A.Float,1 -> array1_float_t
+            | A.Float,2 -> array2_float_t
+            | A.Float,3 -> array3_float_t
+            | _ -> raise(Failure("internal error with dimension")))
+        | A.Int   -> i32_t
+        | A.Bool  -> i1_t
+        | A.Float -> float_t
+        | A.Void  -> void_t
+        | A.Char  -> i8_t
+        | A.String -> string_t
+        | A.Mat(_) -> array2_float_t
+        | A.Img(_) -> array3_i32_t
+      in
+      let members = Array.of_list (List.map ltype_of_typ_opt sdecl.smember_list) in
+      let struct_typ = L.named_struct_type context name in
+      ignore(L.struct_set_body struct_typ members false);
+      StringMap.add name (struct_typ, sdecl) m
+    in 
+    List.fold_left struct_decl StringMap.empty structs
+  in
+
+
   (* Return the LLVM type for a MicroC type *)
   let ltype_of_typ = function
       A.Int   -> i32_t
@@ -82,6 +126,7 @@ let translate program =
             | _ -> raise(Failure("internal error with dimension"))) 
     | A.Mat(_) -> array2_float_t
     | A.Img(_) -> array3_i32_t
+    | A.Struct(n,_) -> let (lty,_) = StringMap.find n struct_decls in lty
 (*     | _ -> raise(Failure("type not supported")) *)
   in
 
@@ -121,8 +166,10 @@ let translate program =
       | SSlice(_) -> raise (Failure "internal error: semant should have rejected slicing in init")
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.global_initializer (lookup_global g_vars s)
+      | SGetMember _ -> raise (Failure "internal error: semant should have rejected get members in init")
+      | SStructAssign(_) -> raise (Failure "internal error: semant should have rejected assign in init")
       | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
-      | SSliceAssign (_) -> raise (Failure "internal error: semant should have rejected assign in init")
+      | SSliceAssign (_) -> raise (Failure "internal error: semant should have rejected slicing assign in init")
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr_val g_vars e1
     and e2' = expr_val g_vars e2 in
@@ -175,7 +222,7 @@ let translate program =
   in
   let globals = List.rev (List.fold_left pick_global_dcl [] program) in
 
-(*   let null_t = L.define_global "__null" (L.const_stringz context "") the_module in  *)
+
 
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
@@ -187,6 +234,9 @@ let translate program =
         | SNoexpr,A.Int | SNoexpr,A.Bool -> L.const_int (ltype_of_typ t) 0
         | SNoexpr,A.Char-> L.const_int (ltype_of_typ t) 0
         | SNoexpr,A.String -> L.const_pointer_null string_t
+        | SNoexpr,A.Struct(n,l) ->
+          let lst_sexpr = List.map (fun (ty, id) -> (ty, SNoexpr)) l in
+           L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map (expr_val m) lst_sexpr))
         | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
@@ -403,6 +453,11 @@ let translate program =
         copy_slice orig index_l (local_vars, builder) true
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
+      | SGetMember (se1, se2) ->
+        let e' = expr (local_vars, builder) se1 in
+        ignore(L.dump_module the_module);
+        L.build_in_bounds_gep e' [|L.const_int i32_t 0|] "tmp" builder
+      | SStructAssign(_) -> raise (Failure "internal error: semant should have rejected assign in init")
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
       | SSliceAssign (v, lst, e) ->
@@ -608,5 +663,4 @@ let translate program =
   in
 
   List.iter build_function_body functions;
-  ignore(L.dump_module the_module);
   the_module
