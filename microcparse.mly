@@ -199,6 +199,18 @@ expr:
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
+  
+/*
+lamb_expr:
+  | LPAREN lamb_ret_typ LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE RPAREN {  }
+
+lamb_ret_typ:
+    LITERAL          { Literal($1)            }
+  | FLIT             { Fliteral($1)           }
+  | BLIT             { BoolLit($1)            }
+  | STRLIT           { StrLit($1)             }
+  | CHARLIT          { CharLit($1)            } */
+
 
 args_opt:
     /* nothing */ { [] }

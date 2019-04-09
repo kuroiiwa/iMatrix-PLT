@@ -1,0 +1,45 @@
+view lambda function definition + arguments as an expr
+
+1. parser
+
+1.1 add lambda expr
+
+lamb_expr:
+  | LPAREN lamb_ret_typ LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE RPAREN {  }
+
+lamb_ret_typ:
+    LITERAL          { Literal($1)            }
+  | FLIT             { Fliteral($1)           }
+  | BLIT             { BoolLit($1)            }
+  | STRLIT           { StrLit($1)             }
+  | CHARLIT          { CharLit($1)            }
+
+1.2 add to expr
+
+expr:
+	...
+  | lamb_expr         { LambCall($1) }
+
+2. AST
+
+dd LambCall to expr
+
+type expr = 
+	...
+	/* we can set function name as 'lambda' for all anonymous functions */
+	| func_decl * expr list 
+
+3. semant
+
+3.1
+check function declaration does not contain lambda functions (because this check happens in global scope),
+but we create a map only for anonymous functions (lamb_map)
+
+3.2 check_expr
+
+check_expr (var_symbols, func_symbols) = function
+	...
+	| LambCall(f, expr_lst) ->
+		/* check lambda function f */
+		/* add f to lamb_map, name is simply index (for the first lambda function we find, name it as 0) */
+		/* use Call() just as other expressions */
