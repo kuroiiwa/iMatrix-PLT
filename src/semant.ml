@@ -339,6 +339,7 @@ let check program =
       | _ -> ());
     match ty,e with
       | Struct(name,_),Noexpr -> let t = type_of_identifier var_symbols name in (t, n, (Void, SNoexpr))
+      | Array(Struct(name, _), d), Noexpr -> let t = type_of_identifier var_symbols name in (Array(t, d), n, (Void, SNoexpr))
       | _,Noexpr -> (ty, n, (Void, SNoexpr))
       | _ ->
     let (rt, e') = check_expr (var_symbols, func_symbols) e in
@@ -471,13 +472,13 @@ let check program =
        | (Void, _) -> raise(Failure("void struct member in " ^ struct_dcl.name))
        | (Struct(n,_) , nn) -> ignore(check_struct_scope var_symbols n); 
         let ty = type_of_identifier var_symbols n in (ty,nn)
-       | (Array(_,d) as arr, n) -> let ty = get_type_arr arr in 
+       | (Array(orig,d) as arr, n) -> let ty = get_type_arr arr in 
          let arr_ty = (match ty with
            | Void -> raise(Failure("void struct member in " ^ struct_dcl.name))
            | Struct(name,_) -> ignore(check_struct_scope var_symbols name);
              let dim = array_dim 0 arr in
              if dim = 1 then type_of_identifier var_symbols name else raise(Failure (n ^ " struct array has dimension more than 1"))
-           | _ as t -> t
+           | _ -> orig
          ) in (Array(arr_ty,d), n)
        | (t, n) -> (t, n)
 (*        | (_, n) -> raise(Failure("illegal struct member definition at " ^ n ^ " in " ^ struct_dcl.name)) *))

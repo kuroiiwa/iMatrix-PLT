@@ -68,7 +68,7 @@ let translate program =
   let structs = List.rev (List.fold_left pick_struct [] program) in
 
 
-  let struct_decls : (L.lltype * sstruct_decl) StringMap.t =
+  let struct_decls : (L.lltype * (A.typ * string) list) StringMap.t =
     let struct_decl m sdecl =
       let name = sdecl.sname in
       let ltype_of_typ_opt (ty, _) = match ty with
@@ -98,7 +98,7 @@ let translate program =
       let members = Array.of_list (List.map ltype_of_typ_opt sdecl.smember_list) in
       let struct_typ = L.named_struct_type context name in
       ignore(L.struct_set_body struct_typ members false);
-      StringMap.add name (struct_typ, sdecl) m
+      StringMap.add name (struct_typ, sdecl.smember_list) m
     in 
     List.fold_left struct_decl StringMap.empty structs
   in
@@ -114,6 +114,7 @@ let translate program =
     | A.String -> string_t
     | A.Array(_) as t -> let (ty, dim) = arr_type_helper t in
           (match ty,dim with
+            | A.Struct(n,_),1 -> let (lty,_) = StringMap.find n struct_decls in L.pointer_type lty
             | A.Char,1 ->  array1_i8_t
             | A.Char,2 ->  array2_i8_t
             | A.Char,3 ->  array3_i8_t
@@ -223,6 +224,24 @@ let translate program =
   let globals = List.rev (List.fold_left pick_global_dcl [] program) in
 
 
+    let rec type_zeroinitializer t = match t with
+    | A.Int | A.Bool -> L.const_int (ltype_of_typ t) 0
+    | A.Float -> L.const_float (ltype_of_typ t) 0.0
+    | A.Char-> L.const_int (ltype_of_typ t) 0
+    | A.String -> L.const_pointer_null string_t
+    | A.Array(arr_ty, num) -> 
+      let tmp = L.define_global "tmp" (L.const_array (ltype_of_typ arr_ty) (Array.of_list (generate_type_list [] arr_ty num))) the_module
+    in L.const_bitcast tmp (ltype_of_typ t)
+    | A.Struct(_, l) ->
+      let lst_sexpr = List.map (fun (ty, id) -> ty) l in
+        L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
+    | _ -> raise(Failure("internal error: type can not be initialized: " ^ A.string_of_typ t))
+
+  and generate_type_list l t n =
+    if n = 0 then l
+    else generate_type_list ((type_zeroinitializer t) :: l) t (n-1)
+  in
+
 
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
@@ -230,14 +249,7 @@ let translate program =
       let (_, tmp) = e in
       let e' = expr_val m e in
       let init = match tmp,t with
-          SNoexpr,A.Float -> L.const_float (ltype_of_typ t) 0.0
-        | SNoexpr,A.Int | SNoexpr,A.Bool -> L.const_int (ltype_of_typ t) 0
-        | SNoexpr,A.Char-> L.const_int (ltype_of_typ t) 0
-        | SNoexpr,A.String -> L.const_pointer_null string_t
-        | SNoexpr,A.Struct(n,l) ->
-          let lst_sexpr = List.map (fun (ty, id) -> (ty, SNoexpr)) l in
-           L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map (expr_val m) lst_sexpr))
-        | SNoexpr,_ -> L.const_int (ltype_of_typ t) 0
+        | SNoexpr,_ -> type_zeroinitializer t
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
         | _,A.Mat(_) | _,A.Img(_) -> L.const_bitcast e' (ltype_of_typ t)
@@ -427,6 +439,43 @@ let translate program =
       | _ -> raise (Failure "internal error: slicing list shoule not be empty")
 
 
+    and getmember (ptr,local_vars,builder) (se1, se2) =
+      let (ty,exp) = se1 in
+        (* The left part should be the type of struct with 1 dimension at most *)
+        let (des, n) = (match exp with
+          | SId(s) -> (lookup local_vars s, s)
+          | SSlice(s, l) ->
+            (* Not working now *)
+            let (a,_) = List.hd l in
+            let pos = expr (local_vars, builder) a in
+            let tmp = L.build_in_bounds_gep (lookup local_vars s) [| pos |] "tmp" builder in
+            (L.build_load tmp "tmp" builder, s)
+          | SGetMember(e1, e2) -> getmember (true, local_vars, builder) (e1, e2)
+          | _ -> raise(Failure "internal error: getmember error"))
+        in
+        let bind_l = match ty with
+          | A.Struct(_, lst) -> lst
+          | _ -> raise(Failure "internal error: getmember error")
+        in
+        let list_pos s lst =
+          let meet = ref 0 in
+          let count (n,s) (_,s') = match s = s' with
+            | true -> meet := 1; (n,s)
+            | false when !meet = 0 -> (n+1,s)
+            | _ ->(n,s)
+          in
+          let (n, _) = List.fold_left count (0,s) lst
+          in n
+        in
+        let pos = match se2 with
+          | (_,SId(s)) -> list_pos s bind_l
+          | (_,SSlice(s,_)) -> list_pos s bind_l
+          | _ -> raise(Failure "internal error: getmember error")
+        in
+        ignore(L.dump_module the_module);
+        let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "tmp" builder in
+        if ptr then (p, n)
+        else (L.build_load p "tmp" builder, n)
 
     (* Construct code for an expression; return its value *)
     and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
@@ -454,10 +503,15 @@ let translate program =
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SGetMember (se1, se2) ->
-        let e' = expr (local_vars, builder) se1 in
-        ignore(L.dump_module the_module);
-        L.build_in_bounds_gep e' [|L.const_int i32_t 0|] "tmp" builder
-      | SStructAssign(_) -> raise (Failure "internal error: semant should have rejected assign in init")
+        let (res, _) = getmember (false, local_vars, builder) (se1, se2) in
+        res
+      | SStructAssign(se1, se2) -> 
+        let (se1', se2') = (match se1 with
+          | (_,SGetMember(a,b)) -> (a,b)
+          | _ -> raise (Failure "internal error: struct assign")) in
+        let (des, _) = getmember (true, local_vars, builder) (se1', se2') in
+        let e' = expr (local_vars, builder) se2 in
+        ignore(L.build_store e' des builder); e'
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
       | SSliceAssign (v, lst, e) ->
@@ -641,9 +695,10 @@ let translate program =
     and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in
-      let () = match tmp with
-        | SNoexpr -> ()
-        | SStrLit str -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
+      let () = match tmp,t with
+        | SNoexpr,A.Array(_) -> ignore(L.build_store (type_zeroinitializer t) local_var builder);()
+        | SNoexpr,_ -> ()
+        | SStrLit str,_ -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
         | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
       in
       (StringMap.add n local_var local_vars, builder)
