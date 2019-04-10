@@ -224,14 +224,13 @@ let translate program =
   let globals = List.rev (List.fold_left pick_global_dcl [] program) in
 
 
-    let rec type_zeroinitializer t = match t with
+  let rec type_zeroinitializer t = match t with
     | A.Int | A.Bool -> L.const_int (ltype_of_typ t) 0
     | A.Float -> L.const_float (ltype_of_typ t) 0.0
     | A.Char-> L.const_int (ltype_of_typ t) 0
     | A.String -> L.const_pointer_null string_t
     | A.Array(arr_ty, num) -> 
-      let tmp = L.define_global "tmp" (L.const_array (ltype_of_typ arr_ty) (Array.of_list (generate_type_list [] arr_ty num))) the_module
-    in L.const_bitcast tmp (ltype_of_typ t)
+      L.const_array (ltype_of_typ arr_ty) (Array.of_list (generate_type_list [] arr_ty num))
     | A.Struct(_, l) ->
       let lst_sexpr = List.map (fun (ty, id) -> ty) l in
         L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
@@ -249,6 +248,9 @@ let translate program =
       let (_, tmp) = e in
       let e' = expr_val m e in
       let init = match tmp,t with
+        | SNoexpr,A.Array(_) ->
+          let spc = L.define_global "data" (type_zeroinitializer t) the_module in
+          L.const_bitcast spc (ltype_of_typ t)
         | SNoexpr,_ -> type_zeroinitializer t
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
@@ -448,8 +450,8 @@ let translate program =
             (* Not working now *)
             let (a,_) = List.hd l in
             let pos = expr (local_vars, builder) a in
-            let tmp = L.build_in_bounds_gep (lookup local_vars s) [| pos |] "tmp" builder in
-            (L.build_load tmp "tmp" builder, s)
+            let src = L.build_load (lookup local_vars s) "tmp" builder in
+            (L.build_in_bounds_gep src [| pos |] "tmp" builder,s)
           | SGetMember(e1, e2) -> getmember (true, local_vars, builder) (e1, e2)
           | _ -> raise(Failure "internal error: getmember error"))
         in
@@ -696,7 +698,10 @@ let translate program =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in
       let () = match tmp,t with
-        | SNoexpr,A.Array(_) -> ignore(L.build_store (type_zeroinitializer t) local_var builder);()
+        | SNoexpr,A.Array(_) -> 
+          let spc = L.build_alloca (L.type_of (type_zeroinitializer t)) "data" builder in
+          let save = L.build_bitcast spc (ltype_of_typ t) "tmp" builder in
+        ignore(L.build_store save local_var builder);()
         | SNoexpr,_ -> ()
         | SStrLit str,_ -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
         | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
