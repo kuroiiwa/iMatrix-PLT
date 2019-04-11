@@ -479,15 +479,63 @@ let translate program =
           let des = L.build_load ptr "tmp" builder in
           L.build_in_bounds_gep des [| offset |] "derefptr" builder
         in
+        let isPtr = ref ptr in
         let final = match se2 with
           | (_,SId(s)) -> p
           | (slice_type ,SSlice(s,l)) -> (match slice_type with
-            | A.Array(_) -> p
+            | A.Array(_) -> if !isPtr = true then p else
+              let orig = L.build_load p "tmp" builder in
+              ignore(isPtr := true);
+              copy_slice orig l (local_vars, builder) true
             | _ -> List.fold_left deref_ptr p l)
           | _ -> raise(Failure "internal error: getmember error")
         in
-        if ptr then (final, n)
+
+        if !isPtr = true then (final, n)
         else (L.build_load final "tmp" builder, n)
+
+    and set_slice (local_vars, builder) (dst, lst, re) ty = 
+       let create_ptr c builder =
+          let tmp = L.build_alloca (L.type_of c) "tmpptr" builder in
+          ignore(L.build_store c tmp builder);
+          tmp
+        in
+
+        let extDim1 = function
+          | A.Array(_) as arr -> let (_, n) = arr_type_helper arr in n
+          | A.Mat(1,_) -> 1
+          | A.Mat(_,_) -> 2
+          | A.Img(1,1,_) -> 1
+          | A.Img(1,_,_) -> 2
+          | A.Img(_,_,_) -> 3
+          | _ -> 1
+        in
+
+        let (t, _) = re in
+        let dimdiff = L.const_int i32_t ((List.length lst) - (extDim1 t)) in
+        let isComType = function
+          | A.Int | A.Float | A.Mat(1,1) | A.Img(1,1,1) -> true
+          | _ -> false in
+        let res_tmp = expr (local_vars, builder) re in
+        let res = if isComType t then create_ptr res_tmp builder
+          else res_tmp in
+        let depth = List.length lst in
+
+        let flatten_l = List.rev (List.fold_left (fun l (a,b) -> b :: a :: l) [] lst) in
+        let tmp = expr (local_vars, builder) (A.Array(A.Int, List.length flatten_l), SArrVal(flatten_l)) in
+        let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
+        let (ty, _) = arr_type_helper ty in
+        (match ty with
+          | A.Int | A.Img(_) ->
+            let res' = L.build_bitcast res array3_i32_t "res" builder
+            and des' = L.build_bitcast dst array3_i32_t "des" builder in
+            L.build_call __setIntArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
+          | A.Float | A.Mat(_) -> 
+            let res' = L.build_bitcast res array3_float_t "res" builder
+            and des' = L.build_bitcast dst array3_float_t "des" builder in
+            L.build_call __setFloArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
+          | _ as t -> raise(Failure(A.string_of_typ t ^ " type does not support slicing copy")))
+
 
     (* Construct code for an expression; return its value *)
     and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
@@ -521,52 +569,20 @@ let translate program =
           | (_,SGetMember(a,b)) -> (a,b)
           | _ -> raise (Failure "internal error: struct assign")) in
         let (des, _) = getmember (true, local_vars, builder) (se1', se2') in
-        let e' = expr (local_vars, builder) se2 in
-        ignore(L.build_store e' des builder); e'
+
+        (match ty,se2' with
+          | A.Array(_),(_, SSlice(_, slice_l)) -> 
+            let dst = L.build_load des "tmp" builder in
+            set_slice (local_vars, builder) (dst, slice_l, se2) ty
+          | _ -> let e' = expr (local_vars, builder) se2 in
+            ignore(L.build_store e' des builder); e')
+
       | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
       | SSliceAssign (v, lst, e) ->
-        let create_ptr c builder =
-          let tmp = L.build_alloca (L.type_of c) "tmpptr" builder in
-          ignore(L.build_store c tmp builder);
-          tmp
-        in
-
-        let extDim1 = function
-          | A.Array(_) as arr -> let (_, n) = arr_type_helper arr in n
-          | A.Mat(1,_) -> 1
-          | A.Mat(_,_) -> 2
-          | A.Img(1,1,_) -> 1
-          | A.Img(1,_,_) -> 2
-          | A.Img(_,_,_) -> 3
-          | _ -> 1
-        in
-
-        let (t, _) = e in
-        let dimdiff = L.const_int i32_t ((List.length lst) - (extDim1 t)) in
-        let isComType = function
-          | A.Int | A.Float | A.Mat(1,1) | A.Img(1,1,1) -> true
-          | _ -> false in
-        let res_tmp = expr (local_vars, builder) e in
-        let res = if isComType t then create_ptr res_tmp builder
-          else res_tmp in
-        let depth = List.length lst in
         let des = L.build_load (lookup local_vars v) v builder in
+        set_slice (local_vars, builder) (des, lst, e) ty 
 
-        let flatten_l = List.rev (List.fold_left (fun l (a,b) -> b :: a :: l) [] lst) in
-        let tmp = expr (local_vars, builder) (A.Array(A.Int, List.length flatten_l), SArrVal(flatten_l)) in
-        let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
-        let (ty, _) = arr_type_helper ty in
-        (match ty with
-          | A.Int | A.Img(_) ->
-            let res' = L.build_bitcast res array3_i32_t "res" builder
-            and des' = L.build_bitcast des array3_i32_t "des" builder in
-            L.build_call __setIntArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
-          | A.Float | A.Mat(_) -> 
-            let res' = L.build_bitcast res array3_float_t "res" builder
-            and des' = L.build_bitcast des array3_float_t "des" builder in
-            L.build_call __setFloArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
-          | _ as t -> raise(Failure(A.string_of_typ t ^ " type does not support slicing copy")))
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
     and e2' = expr (local_vars, builder) e2 in
@@ -619,6 +635,7 @@ let translate program =
         let (t,_) = e in
         let ar = extDim t in
         let des = L.build_bitcast e' array3_i32_t "tmp" builder in
+        ignore(L.dump_module the_module);
         L.build_call printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
         "printIntArr" builder
       | SCall ("printCharArr", [e]) ->
@@ -728,21 +745,13 @@ let translate program =
         in
         let (_, tmp) = List.fold_left (fun (n,l) (ty, _) -> (n+1, (ty,n) :: l)) (0,[]) l in
         let lst_ty = List.rev tmp in
-        ignore(L.dump_module the_module);
         ignore(List.map (store_helper builder des) lst_ty);
         des
-(*         let memval = List.map (local_type_zeroinitializer builder) lst_sexpr in
-          L.const_named_struct (ltype_of_typ t) (Array.of_list memval) *)
       | _ -> raise(Failure("internal error: type can not be initialized: " ^ A.string_of_typ t))
 
     and gen_type_list l t n =
       if n = 0 then l
       else gen_type_list (t :: l) t (n-1)
-
-    and generate_type_list builder l t n =
-      if n = 0 then l
-      else generate_type_list builder ((local_type_zeroinitializer builder t) :: l) t (n-1)
-    
 
     and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
