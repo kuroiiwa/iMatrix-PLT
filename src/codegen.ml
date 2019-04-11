@@ -230,7 +230,9 @@ let translate program =
     | A.Char-> L.const_int (ltype_of_typ t) 0
     | A.String -> L.const_pointer_null string_t
     | A.Array(arr_ty, num) -> 
-      L.const_array (ltype_of_typ arr_ty) (Array.of_list (generate_type_list [] arr_ty num))
+      let arrval = L.const_array (ltype_of_typ arr_ty) (Array.of_list (generate_type_list [] arr_ty num)) in
+      let spc = L.define_global "data" arrval the_module in
+          L.const_bitcast spc (ltype_of_typ t)
     | A.Struct(_, l) ->
       let lst_sexpr = List.map (fun (ty, id) -> ty) l in
         L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
@@ -248,9 +250,6 @@ let translate program =
       let (_, tmp) = e in
       let e' = expr_val m e in
       let init = match tmp,t with
-        | SNoexpr,A.Array(_) ->
-          let spc = L.define_global "data" (type_zeroinitializer t) the_module in
-          L.const_bitcast spc (ltype_of_typ t)
         | SNoexpr,_ -> type_zeroinitializer t
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
@@ -474,10 +473,21 @@ let translate program =
           | (_,SSlice(s,_)) -> list_pos s bind_l
           | _ -> raise(Failure "internal error: getmember error")
         in
-        ignore(L.dump_module the_module);
         let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "tmp" builder in
-        if ptr then (p, n)
-        else (L.build_load p "tmp" builder, n)
+        let deref_ptr ptr (a,_) =
+          let offset = expr (local_vars, builder) a in
+          let des = L.build_load ptr "tmp" builder in
+          L.build_in_bounds_gep des [| offset |] "derefptr" builder
+        in
+        let final = match se2 with
+          | (_,SId(s)) -> p
+          | (slice_type ,SSlice(s,l)) -> (match slice_type with
+            | A.Array(_) -> p
+            | _ -> List.fold_left deref_ptr p l)
+          | _ -> raise(Failure "internal error: getmember error")
+        in
+        if ptr then (final, n)
+        else (L.build_load final "tmp" builder, n)
 
     (* Construct code for an expression; return its value *)
     and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
@@ -494,8 +504,7 @@ let translate program =
         in
         let (ty_ele, _) = List.hd arr in
         let arrval = List.map (expr (local_vars,builder)) arr in
-        let tmp = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "tmp" builder in
-        let ptr_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
+        let ptr_tmp = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "tmp" builder in
         let ptr = L.build_bitcast ptr_tmp (ltype_of_typ ty) "tmp" builder in
         ignore(List.fold_left (arr_helper builder) ptr arrval);
         ptr
@@ -694,15 +703,52 @@ let translate program =
       ( SBlock [SStmt(SExpr e1) ; SStmt(SWhile (e2, SBlock [SStmt(body) ; SStmt(SExpr e3)])) ] )
 
 
+    and local_type_zeroinitializer des builder t = match t with
+      | A.Int | A.Bool -> L.build_store (L.const_int (ltype_of_typ t) 0) des builder
+      | A.Float -> L.build_store (L.const_float (ltype_of_typ t) 0.0) des builder
+      | A.Char-> L.build_store (L.const_int (ltype_of_typ t) 0) des builder
+      | A.String -> L.build_store (L.const_pointer_null string_t) des builder
+      | A.Array(arr_ty, num) ->
+        let store_helper builder ptr t =
+          ignore(local_type_zeroinitializer ptr builder t);
+          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "tmp" builder
+        in
+
+        let ty_l = gen_type_list [] arr_ty num in
+        let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder in
+        let ptr = L.build_bitcast spc (ltype_of_typ t) "tmp" builder in
+
+        ignore(List.fold_left (store_helper builder) ptr ty_l);
+        L.build_store ptr des builder
+
+      | A.Struct(_, l) -> 
+        let store_helper builder des (t,n) =
+          let ptr = L.build_in_bounds_gep des [| L.const_int i32_t 0 ; L.const_int i32_t n|] "tmp" builder in
+          local_type_zeroinitializer ptr builder t
+        in
+        let (_, tmp) = List.fold_left (fun (n,l) (ty, _) -> (n+1, (ty,n) :: l)) (0,[]) l in
+        let lst_ty = List.rev tmp in
+        ignore(L.dump_module the_module);
+        ignore(List.map (store_helper builder des) lst_ty);
+        des
+(*         let memval = List.map (local_type_zeroinitializer builder) lst_sexpr in
+          L.const_named_struct (ltype_of_typ t) (Array.of_list memval) *)
+      | _ -> raise(Failure("internal error: type can not be initialized: " ^ A.string_of_typ t))
+
+    and gen_type_list l t n =
+      if n = 0 then l
+      else gen_type_list (t :: l) t (n-1)
+
+    and generate_type_list builder l t n =
+      if n = 0 then l
+      else generate_type_list builder ((local_type_zeroinitializer builder t) :: l) t (n-1)
+    
+
     and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in
       let () = match tmp,t with
-        | SNoexpr,A.Array(_) -> 
-          let spc = L.build_alloca (L.type_of (type_zeroinitializer t)) "data" builder in
-          let save = L.build_bitcast spc (ltype_of_typ t) "tmp" builder in
-        ignore(L.build_store save local_var builder);()
-        | SNoexpr,_ -> ()
+        | SNoexpr,_ -> ignore(local_type_zeroinitializer local_var builder t);()
         | SStrLit str,_ -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
         | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
       in
