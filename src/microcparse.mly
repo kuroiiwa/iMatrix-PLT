@@ -8,9 +8,9 @@ let bind_arr_dcl_noexpr t id dim = match t,dim with
   | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, Noexpr)
   | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, Noexpr)
   | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
-  | _,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
-  | _,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
-  | _,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
+  | t,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
+  | t,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
+  | t,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
   | _ -> raise(Failure("dimension error"))
 
 let bind_arr_dcl_expr t id dim e = match t,dim with
@@ -199,6 +199,18 @@ expr:
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
+  
+/*
+lamb_expr:
+  | LPAREN lamb_ret_typ LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE RPAREN {  }
+
+lamb_ret_typ:
+    LITERAL          { Literal($1)            }
+  | FLIT             { Fliteral($1)           }
+  | BLIT             { BoolLit($1)            }
+  | STRLIT           { StrLit($1)             }
+  | CHARLIT          { CharLit($1)            } */
+
 
 struct_member_opt:
   | struct_member DOT struct_member     { GetMember($1, $3)      }
