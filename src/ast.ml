@@ -6,11 +6,9 @@ type op = Add | Sub | Mult | Div | Mod | Pow | Equal | Neq | Less | Leq | Greate
 type uop = Neg | Not
 
 
-type typ = Int | Bool | Float | Char | String | Void | Mat of mat_type | Img of img_type | Array of arr_type | Struct of struct_type
+type typ = Int | Bool | Float | Char | String | Void | Mat | Img | Array of arr_type | Struct of struct_type
 
 and struct_type = string * ((typ * string) list)
-and mat_type = int * int
-and img_type = int * int * int
 and arr_type = typ * int
 
 
@@ -137,8 +135,8 @@ and string_of_typ = function
   | Char -> "char"
   | String -> "string"
   | Void -> "void"
-  | Mat(a,b) -> "mat[" ^ string_of_int a ^ "," ^ string_of_int b ^ "]"
-  | Img(a,b,c) -> "img[" ^ string_of_int a ^ "," ^ string_of_int b ^ "," ^ string_of_int c ^ "]"
+  | Mat -> "mat"
+  | Img -> "img"
   | Array(_, _) as arr -> string_of_dim "" arr 
   | Struct(n,_) -> "struct " ^ n
 

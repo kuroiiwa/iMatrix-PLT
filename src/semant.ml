@@ -20,12 +20,10 @@ let check program =
   in
 
   let check_assign lvaluet rvaluet err = match lvaluet,rvaluet with
-    | Mat(0,0),Array(Array(Float,a),b) when a > 0 && b > 0 -> Mat(b,a)
-    | Mat(a,b),Array(Array(Float,c),d) when a = d && b = c -> Mat(a,b)
-    | Mat(0,0),Mat(a,b) when a > 0 && b > 0 -> Mat(a,b)
-    | Img(0,0,0),Array(Array(Array(Int,a),b),c) when a > 0 && b > 0 && c > 0 -> Img(c,b,a)
-    | Img(d,e,f),Array(Array(Array(Int,a),b),c) when a = f && b = e && c = d -> Img(d,e,f)
-    | Img(0,0,0),Img(a,b,c) when a > 0 && b > 0 && c > 0 -> Img(a,b,c)
+    | Mat,Array(Array(Float,a),b) when a > 0 && b > 0 -> Mat
+    | Mat,Mat -> Mat
+    | Img,Array(Array(Array(Int,a),b),c) when a > 0 && b > 0 && c > 0 -> Img
+    | Img,Img -> Img
     | Array(t, 0),Array(_) -> let actual_ty = get_type_arr rvaluet in 
       if actual_ty = t then rvaluet else raise (Failure err)
     | _,_ -> if lvaluet = rvaluet then lvaluet else raise (Failure err)
@@ -89,9 +87,9 @@ let check program =
     
     match typ with
     (* the input is a legal slice *)
-    | Mat(_) -> (Mat(fst (get_fst var), fst (get_snd var)), 
+    | Mat -> (Mat, 
               SSlice(name, List.map (fun (a,b) -> b) var))
-    | Img(_) -> (Img(fst (get_fst var), fst (get_snd var), fst (get_trd var)),
+    | Img -> (Img,
               SSlice(name, List.map (fun (a,b) -> b) var))
     | Array(cont,_) -> 
       (match cont with
@@ -125,6 +123,12 @@ let check program =
     | Array(t,d) when d=1 -> downgrade_dim t
     | _ as t -> t
   in
+
+  let check_equal (((_,a),(_,b)) as tuple) = match a,b with
+    | SId(_),SId(_) -> tuple
+    | SLiteral(a), SLiteral(b) when a = b -> tuple
+    | _ -> raise(Failure("illegal slicing for mat/img")) 
+  in
   
   let rec check_slice (vars, funcs) n l =
     let ty = type_of_identifier vars n in
@@ -135,17 +139,14 @@ let check program =
       else raise(Failure("illegal slicing"))
     in
     match ty,(List.length l) with
-
-      | Mat(a,b),_ -> 
-        let l' = List.map check_slice_expr (expand_slice l 2) in
-        let l_adjusted = [a; b] in
-        let legal_slice = List.map2 (slice_helper1 n) l_adjusted l' in
-        slice_helper2 legal_slice ty n
-      | Img(a,b,c),_ ->
-        let l' = List.map check_slice_expr (expand_slice l 3) in
-        let l_adjusted = [a;b;c] in
-        let legal_slice = List.map2 (slice_helper1 n) l_adjusted l' in
-        slice_helper2 legal_slice ty n
+      | Mat,2 -> 
+        let l' = List.map check_slice_expr l in
+        ignore(List.map check_equal l');
+        (Float, SGetMember((Mat, SId(n)), (Float, SSlice("data", l'))))
+      | Img,3 ->
+        let l' = List.map check_slice_expr l in
+        ignore(List.map check_equal l');
+        (Int, SGetMember((Img, SId(n)), (Int, SSlice("data", l'))))
       | Array(_),sn when (array_dim 0 ty) >= sn ->
         let actual_n = array_dim 0 ty in
         let l' = List.map check_slice_expr (expand_slice l actual_n) in
@@ -260,19 +261,19 @@ let check program =
     | Call("printFloatArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
       (match ty with
         | Array(_) as arr_t when get_type_arr arr_t = Float -> (Void, SCall("printFloatArr", [(ty,e')]))
-        | Mat(_) -> (Void, SCall("printFloatArr", [(ty,e')]))
+(*         | Mat(_) -> (Void, SCall("printFloatArr", [(ty,e')])) *)
         | _ -> raise(Failure("illegal argument in printFloatArr")))
     | Call("printIntArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
       (match ty with
         | Array(_) as arr_t when get_type_arr arr_t = Int -> (Void, SCall("printIntArr", [(ty,e')]))
-        | Img(_) -> (Void, SCall("printIntArr", [(ty,e')]))
+(*         | Img(_) -> (Void, SCall("printIntArr", [(ty,e')])) *)
         | _ -> raise(Failure("illegal argument in printIntArr")))
     | Call("printCharArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
       (match ty with
         | Array(_) as arr_t when get_type_arr arr_t = Char -> (Void, SCall("printCharArr", [(ty,e')]))
         | _ -> raise(Failure("illegal argument in printIntArr")))
-    | Call("matMul", [e1;e2;e3]) -> 
-      let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
+    | Call("matMul", [e1;e2;e3]) -> raise(Failure("matmul here"))
+(*       let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
       let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
       let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
       let check_typ_helper = function Mat(_) -> () 
@@ -289,8 +290,8 @@ let check program =
       ignore(check_typ_helper ty2);
       ignore(check_typ_helper ty3);
       ignore( check_dim_helper ty1 ty2 ty3);
-      (Void, SCall("matMul", [(ty1,e1');(ty2,e2');(ty3,e3')]))
-    | ( Call("aveFilter", [e1;e2;e3])
+      (Void, SCall("matMul", [(ty1,e1');(ty2,e2');(ty3,e3')])) *)
+(*     | ( Call("aveFilter", [e1;e2;e3])
       | Call("edgeDetection", [e1;e2;e3])) as f ->
       let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
       let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
@@ -311,7 +312,7 @@ let check program =
       (match f with
       | Call("aveFilter",_) -> (Void, SCall("aveFilter", [(ty1, e1');(ty2, e2');(ty3, e3')]))  
       | Call("edgeDetection",_) -> (Void, SCall("edgeDetection", [(ty1, e1');(ty2, e2');(ty3, e3')]))      
-      | _ -> raise(Failure("internel error: unsupported function detected")))
+      | _ -> raise(Failure("internel error: unsupported function detected"))) *)
     | Call(fname, args) as call -> 
         let fd = find_func func_symbols fname in
         let param_length = List.length fd.formals in
@@ -392,16 +393,24 @@ let check program =
 
   (**** Collect all built-in functions at first ****)
   let built_in_decls = 
-    let add_bind map (fty, name, ty) = StringMap.add name {
+    let collect_formals l =
+      let helper (n, lst) ty =
+        (n+1, (ty, "x" ^ string_of_int n, Noexpr) :: lst)
+      in let (_, res) = (List.fold_left helper (0, []) l)
+      in List.rev res
+    in
+    let add_bind map (fty, name, l) = StringMap.add name {
       typ = fty;
       fname = name; 
-      formals = [(ty, "x", Noexpr)];
+      formals = collect_formals l;
       body = [] } map
     in List.fold_left add_bind StringMap.empty [
-                               (Void, "printbig", Int);
-                               (Void, "print", Int);
-                               (Void, "printFloatArr", Array(Float, 1));
-                               (Void, "printIntArr", Array(Int, 1))]
+                               (Void, "printbig", [Int]);
+                               (Void, "print", [Int]);
+                               (Void, "printFloatArr", [Array(Float, 1)]);
+                               (Void, "printIntArr", [Array(Int, 1)]);
+                               (Mat, "malloc_mat", [Int; Int]);
+                               (Img, "malloc_img", [Int; Int])]
   in
 
   (**** Add func to func_symbols with error handler ****)

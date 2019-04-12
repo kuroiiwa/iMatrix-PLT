@@ -33,6 +33,9 @@ let translate program =
   and float_t    = L.double_type context
   and void_t     = L.void_type   context in
 
+  let mat_t      = L.named_struct_type context "mat"
+  and img_t      = L.named_struct_type context "img" in
+
   let string_t   = L.pointer_type i8_t
   and array1_i8_t   = L.pointer_type i8_t
   and array1_i32_t   = L.pointer_type i32_t

@@ -5,20 +5,14 @@ open Ast
 
 let bind_arr_dcl_noexpr t id dim = match t,dim with
   | _,(0,0,0) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, Noexpr)
-  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, Noexpr)
-  | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
+  | Mat,_ | Img,_ -> raise(Failure("matrix and image should have initialization"))
   | t,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
   | t,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
   | t,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
   | _ -> raise(Failure("dimension error"))
 
 let bind_arr_dcl_expr t id dim e = match t,dim with
-  | Mat(_,_),(0,0,0) -> (t, id, e)
-  | Img(_,_,_),(0,0,0) -> (t, id, e)
-  | Mat(_,_),(0,a,b) when a > 0 && b > 0 -> (Mat(a,b), id, e)
-  | Img(_,_,_),(a,b,c) when a > 0 && b > 0 && c > 0 -> (Img(a,b,c), id, e)
-  | Mat(_,_),_ | Img(_,_,_),_ -> raise(Failure("illegal matrix/image dimension"))
+  | Mat,_ | Img,_ -> raise(Failure("matrix and image should have initialization"))
   | _,(0,0,0) -> (Array(t, 0), id, e) (* canary value here *)
   | _,(0,0,a) when a > 0 -> (Array(t,a), id, e)
   | _,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, e)
@@ -26,8 +20,22 @@ let bind_arr_dcl_expr t id dim e = match t,dim with
   | _ -> raise(Failure("dimension error"))
 
 let bind_dcl ty id e = match ty with
-  | Mat(_) | Img(_) -> raise(Failure("array declartion without initialization should have specific dimension"))
+  | Mat | Img -> raise(Failure("matrix and image should have initialization"))
   | _ -> (ty, id, e)
+
+let bind_arr_mat_img typ id (e1, e2) dim = 
+  let rec gen_list l name (e1,e2) n =
+    if n = 0 then l
+    else gen_list (Call(name, [e1 ; e2]) :: l) name (e1,e2) (n-1)
+  in match typ,dim with
+  | Mat,(0,0,a) -> (Array(Mat, a), id, let lst = gen_list [] "malloc_mat" (e1,e2) a in Arr1Val(lst))
+  | Img,(0,0,a) -> (Array(Img, a), id, let lst = gen_list [] "malloc_img" (e1,e2) a in Arr1Val(lst))
+  | _ -> raise(Failure("struct does not have initialization"))
+
+let bind_mat_img typ id (e1, e2) = match typ with
+  | Mat -> (Mat, id, Call("malloc_mat", [e1 ; e2]))
+  | Img -> (Img, id, Call("malloc_img", [e1 ; e2]))
+  | _ -> raise(Failure("struct does not have initialization"))
 
 %}
 
@@ -123,8 +131,8 @@ typ:
   | CHAR  { Char }
   | STRING { String }
   | VOID  { Void  }
-  | MAT   { Mat(0,0) }
-  | IMG   { Img(0,0,0) }
+  | MAT   { Mat }
+  | IMG   { Img }
   | STRUCT ID { Struct($2, []) }
 
 func_body_list:
@@ -137,6 +145,9 @@ vdecl:
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
   | typ ID LBRACK dim_opt RBRACK SEMI { bind_arr_dcl_noexpr $1 $2 $4 }
   | typ ID LBRACK dim_opt RBRACK ASSIGN expr SEMI { bind_arr_dcl_expr $1 $2 $4 $7}
+  | typ ID LPAREN expr COMMA expr RPAREN LBRACK dimension RBRACK SEMI { bind_arr_mat_img $1 $2 ($4, $6) $9}
+  | typ ID LPAREN expr COMMA expr RPAREN SEMI { bind_mat_img $1 $2 ($4, $6) }
+
 
 dim_opt:
   |             { (0, 0, 0)}
