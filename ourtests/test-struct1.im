@@ -1,0 +1,18 @@
+struct test {
+	int a;
+	float b;
+	char c;
+};
+
+int main() {	
+	struct test simple;
+	simple.a = 1;
+	simple.b = 2.0;
+	simple.c = 'a';
+
+	print(simple.a);
+	print(simple.b);
+	print(simple.c);
+
+	return 0;
+}

@@ -1,0 +1,18 @@
+struct test1 {
+	int c;
+};
+
+struct test {
+	struct test1 a[10];
+};
+
+int main() {	
+	struct test simple;
+	int i;
+	for (i = 0; i < 10; ++i)
+		simple.a[i].c = i;
+	for (i = 0; i < 10; ++i)
+		print(simple.a[i].c);
+
+	return 0;
+}

@@ -1,0 +1,14 @@
+struct test {
+	int a[10];
+};
+
+int main() {	
+	struct test simple;
+	int i;
+	for (i = 0; i < 10; ++i)
+		simple.a[i] = i;
+	for (i = 0; i < 10; ++i)
+		print(simple.a[i]);
+
+	return 0;
+}

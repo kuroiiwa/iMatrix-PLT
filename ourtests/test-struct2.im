@@ -1,0 +1,19 @@
+struct inside {
+	int a;	
+};
+
+struct test {
+	int a;
+	float b;
+	char c;
+	struct inside d;
+};
+
+int main() {	
+	struct test simple;
+	simple.d.a = 1;
+
+	print(simple.d.a);
+
+	return 0;
+}

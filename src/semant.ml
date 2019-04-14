@@ -186,9 +186,9 @@ let check program =
       let (ty, name) = List.find (fun (_,n) -> n = s) mem_list in
       (match ty with
        | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) -> 
-         let (rt, re) = check_expr (vars, funcs) e2 in
+         let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
          (ty, SGetMember((lt,e1'), (rt, re)))
-       | _ -> let (rt, re) = check_expr (vars, funcs) e2 in
+       | _ -> let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
          (rt, SGetMember((lt, e1') ,(rt, re))))
     | Id(s) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
     | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
