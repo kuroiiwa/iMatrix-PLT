@@ -18,6 +18,9 @@ open Sast
 
 module StringMap = Map.Make(String)
 
+exception NotImplemented
+exception InternalError of string
+
 (* translate : Sast.program -> Llvm.module *)
 let translate program =
   let context    = L.global_context () in
@@ -33,8 +36,8 @@ let translate program =
   and float_t    = L.double_type context
   and void_t     = L.void_type   context in
 
-  let mat_t      = L.named_struct_type context "mat"
-  and img_t      = L.named_struct_type context "img" in
+  let mat_t      = L.pointer_type (L.named_struct_type context "mat")
+  and img_t      = L.pointer_type (L.named_struct_type context "img") in
 
   let string_t   = L.pointer_type i8_t
   and array1_i8_t   = L.pointer_type i8_t
@@ -51,17 +54,15 @@ let translate program =
 
 
   (* array type and dimension helper function *)
-  let arr_type_helper t =
-    let rec get_dim n = function
-      | A.Array(t, _) -> get_dim (n+1) t
-      | _ -> n
-    in
-    let rec get_type_arr = function
-      | A.Array(t, _) -> get_type_arr t
-      | _ as t -> t
-    in
-    (get_type_arr t, get_dim 0 t)
+  let rec get_dim n = function
+    | A.Array(t, _) -> get_dim (n+1) t
+    | _ -> n
   in
+  let rec get_type_arr = function
+    | A.Array(t, _) -> get_type_arr t
+    | _ as t -> t
+  in
+  let arr_type_helper t = (get_type_arr t, get_dim 0 t) in
 
 
   let pick_struct lst = function
@@ -88,15 +89,17 @@ let translate program =
             | A.Float,1 -> array1_float_t
             | A.Float,2 -> array2_float_t
             | A.Float,3 -> array3_float_t
-            | _ -> raise(Failure("internal error with dimension")))
+            | A.Mat,1 -> L.pointer_type mat_t
+            | A.Img,1 -> L.pointer_type img_t
+            | _ -> raise(InternalError("array dimension in struct generation")))
         | A.Int   -> i32_t
         | A.Bool  -> i1_t
         | A.Float -> float_t
         | A.Void  -> void_t
         | A.Char  -> i8_t
         | A.String -> string_t
-        | A.Mat(_) -> array2_float_t
-        | A.Img(_) -> array3_i32_t
+        | A.Mat -> mat_t
+        | A.Img -> img_t
       in
       let members = Array.of_list (List.map ltype_of_typ_opt sdecl.smember_list) in
       let struct_typ = L.named_struct_type context name in
@@ -127,11 +130,12 @@ let translate program =
             | A.Float,1 -> array1_float_t
             | A.Float,2 -> array2_float_t
             | A.Float,3 -> array3_float_t
-            | _ -> raise(Failure("internal error with dimension"))) 
-    | A.Mat(_) -> array2_float_t
-    | A.Img(_) -> array3_i32_t
+            | A.Mat,1 -> L.pointer_type mat_t
+            | A.Img,1 -> L.pointer_type img_t
+            | _ -> raise(InternalError("dimension in type translation"))) 
+    | A.Mat -> mat_t
+    | A.Img -> img_t
     | A.Struct(n,_) -> let (lty,_) = StringMap.find n struct_decls in lty
-(*     | _ -> raise(Failure("type not supported")) *)
   in
 
   let pick_func lst = function
@@ -139,6 +143,97 @@ let translate program =
     | _ -> lst
   in
   let functions = List.fold_left pick_func [] program in
+
+(* functions that are only used internally *)
+  let __printf_t : L.lltype = 
+      L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
+  let __printf_func : L.llvalue = 
+      L.declare_function "printf" __printf_t the_module in
+
+  let __printIntArr_t : L.lltype =
+      L.function_type i32_t [| array3_i32_t ; i32_t ; i32_t ; i32_t |] in
+  let __printIntArr_func : L.llvalue =
+      L.declare_function "__printIntArr" __printIntArr_t the_module in
+
+  let __printFloatArr_t : L.lltype =
+      L.function_type i32_t [| array3_float_t ; i32_t ; i32_t ; i32_t |] in
+  let __printFloatArr_func : L.llvalue =
+      L.declare_function "__printFloatArr" __printFloatArr_t the_module in
+  
+  let __printCharArr_t : L.lltype =
+      L.function_type i32_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
+  let __printCharArr_func : L.llvalue =
+      L.declare_function "__printCharArr" __printCharArr_t the_module in
+
+  let __printMat_t : L.lltype =
+      L.function_type i32_t [| mat_t |] in
+  let __printMat_func : L.llvalue =
+      L.declare_function "printMat" __printMat_t the_module in
+
+  let __setIntArray_t : L.lltype =
+      L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
+  let __setIntArray_func : L.llvalue =
+      L.declare_function "__setIntArray" __setIntArray_t the_module in
+
+  let __setFloArray_t : L.lltype =
+      L.function_type i32_t [|i32_t; array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
+  let __setFloArray_func : L.llvalue =
+      L.declare_function "__setFloArray" __setFloArray_t the_module in
+
+  let __returnMatVal_t : L.lltype =
+      L.function_type float_t [| mat_t; i32_t ; i32_t |] in
+  let __returnMatVal_func : L.llvalue =
+      L.declare_function "__returnMatVal" __returnMatVal_t the_module in
+
+  let __returnImgVal_t : L.lltype =
+      L.function_type i32_t [| img_t; i32_t ; i32_t; i32_t |] in
+  let __returnImgVal_func : L.llvalue =
+      L.declare_function "__returnImgVal" __returnImgVal_t the_module in
+
+  let __setMatVal_t : L.lltype =
+      L.function_type i32_t [| float_t; mat_t; i32_t ; i32_t |] in
+  let __setMatVal_func : L.llvalue =
+      L.declare_function "__setMatVal" __setMatVal_t the_module in
+
+  let __setImgVal_t : L.lltype =
+      L.function_type i32_t [| i32_t; img_t; i32_t ; i32_t; i32_t |] in
+  let __setImgVal_func : L.llvalue =
+      L.declare_function "__setImgVal" __setImgVal_t the_module in
+
+  let matMul_t : L.lltype = 
+      L.function_type i32_t [| array2_float_t ; array2_float_t ; array2_float_t;
+                               i32_t ; i32_t ; i32_t|] in
+  let matMul_func: L.llvalue = 
+      L.declare_function "matMul" matMul_t the_module in
+      
+  let aveFilter_t : L.lltype = 
+      L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
+                               i32_t ; i32_t ; i32_t|] in
+  let aveFilter_func: L.llvalue = 
+      L.declare_function "aveFilter" aveFilter_t the_module in
+      
+  let edgeDetection_t : L.lltype = 
+      L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
+                               i32_t ; i32_t ; i32_t|] in
+  let edgeDetection_func: L.llvalue = 
+      L.declare_function "edgeDetection" edgeDetection_t the_module in
+
+(* buult-in functions for users *)
+  let builtin_funcs =
+    let builtin = [
+      ("malloc_mat", A.Mat, L.function_type mat_t [| i32_t; i32_t|]);
+      ("malloc_img", A.Img, L.function_type img_t [| i32_t; i32_t|]);
+      ("free_mat", A.Void, L.function_type i32_t [| mat_t |]);
+      ("free_img", A.Void, L.function_type i32_t [| img_t |])
+      ]
+    in
+    let add_builtit m (n, ty, llty) =
+      let func = L.declare_function n llty the_module in
+      let decl = { styp = ty; sfname = n; sformals = []; sbody = []; } in
+      StringMap.add n (func, decl) m
+    in
+    List.fold_left add_builtit StringMap.empty builtin
+  in
 
   (* Define each function (arguments and return type) so we can 
      call it even before we've created its body *)
@@ -149,11 +244,11 @@ let translate program =
   Array.of_list (List.map (fun (t, _, _) -> ltype_of_typ t) fdecl.sformals)
       in let ftype = L.function_type (ltype_of_typ fdecl.styp) formal_types in
       StringMap.add name (L.define_function name ftype the_module, fdecl) m in
-    List.fold_left function_decl StringMap.empty functions in
+    List.fold_left function_decl builtin_funcs functions in
 
   (* this lookup function is only for global declarations*)
   let lookup_global m n = try StringMap.find n m
-                 with Not_found -> raise(Failure ("internal error: global var/func should have been defined"))
+                 with Not_found -> raise(InternalError("global var/func should have been defined"))
   in
 
   (* return llvalue for a expr for inline init (function call and assign not supported)*)
@@ -167,13 +262,13 @@ let translate program =
         let (ty_ele, _) = List.hd arr in
         let arrval = List.map (expr_val g_vars) arr in
         L.define_global "tmp" (L.const_array (ltype_of_typ ty_ele) (Array.of_list arrval)) the_module
-      | SSlice(_) -> raise (Failure "internal error: semant should have rejected slicing in init")
+      | SSlice(_) -> raise (InternalError("semant should have rejected slicing in init"))
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.global_initializer (lookup_global g_vars s)
-      | SGetMember _ -> raise (Failure "internal error: semant should have rejected get members in init")
-      | SStructAssign(_) -> raise (Failure "internal error: semant should have rejected assign in init")
-      | SAssign (_, _) -> raise (Failure "internal error: semant should have rejected assign in init")
-      | SSliceAssign (_) -> raise (Failure "internal error: semant should have rejected slicing assign in init")
+      | SGetMember _ -> raise (InternalError("semant should have rejected get members in init"))
+      | SStructAssign(_) -> raise (InternalError("semant should have rejected assign in init"))
+      | SAssign (_, _) -> raise (InternalError("semant should have rejected assign in init"))
+      | SSliceAssign (_) -> raise (InternalError("semant should have rejected slicing assign in init"))
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr_val g_vars e1
     and e2' = expr_val g_vars e2 in
@@ -189,7 +284,7 @@ let translate program =
     | A.Greater -> L.const_fcmp L.Fcmp.Ogt
     | A.Geq     -> L.const_fcmp L.Fcmp.Oge
     | A.And | A.Or | A.Mod | A.Pow ->
-        raise (Failure "internal error: semant should have rejected and/or on float")
+        raise (InternalError("semant should have rejected and/or on float"))
     ) e1' e2'
       | SBinop (e1, op, e2) ->
     let e1' = expr_val g_vars e1
@@ -208,7 +303,7 @@ let translate program =
     | A.Leq     -> L.const_icmp L.Icmp.Sle
     | A.Greater -> L.const_icmp L.Icmp.Sgt
     | A.Geq     -> L.const_icmp L.Icmp.Sge
-    | A.Pow     ->  raise (Failure "internal error: Power for int not supported yet")
+    | A.Pow     ->  raise (InternalError("Power for int not supported yet"))
     ) e1' e2'
       | SUnop(op, ((t, _) as e)) ->
           let e' = expr_val g_vars e in
@@ -216,7 +311,7 @@ let translate program =
       A.Neg when t = A.Float -> L.const_fneg 
     | A.Neg                  -> L.const_neg
     | A.Not                  -> L.const_not) e'
-      | SCall (_, _) -> raise(Failure ("internal error:function call should be rejected by semantic check"))
+      | SCall (_, _) -> raise(InternalError("function call init should be rejected by semantic check"))
   in
 
 
@@ -239,7 +334,8 @@ let translate program =
     | A.Struct(_, l) ->
       let lst_sexpr = List.map (fun (ty, id) -> ty) l in
         L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
-    | _ -> raise(Failure("internal error: type can not be initialized: " ^ A.string_of_typ t))
+    | A.Mat | A.Img -> raise(InternalError("mat and img should have malloc init"))
+    | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
   and generate_type_list l t n =
     if n = 0 then l
@@ -256,65 +352,13 @@ let translate program =
         | SNoexpr,_ -> type_zeroinitializer t
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
-        | _,A.Mat(_) | _,A.Img(_) -> L.const_bitcast e' (ltype_of_typ t)
+        | _,A.Mat | _,A.Img -> raise(InternalError("mat and img should have malloc init"))
         | _,_ -> e'
       in 
       StringMap.add n (L.define_global n init the_module) m 
     in
     List.fold_left global_var StringMap.empty globals in
 
-  let printf_t : L.lltype = 
-      L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
-  let printf_func : L.llvalue = 
-      L.declare_function "printf" printf_t the_module in
-
-  let printbig_t : L.lltype =
-      L.function_type i32_t [| i32_t |] in
-  let printbig_func : L.llvalue =
-      L.declare_function "printbig" printbig_t the_module in
-
-  let __setIntArray_t : L.lltype =
-      L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
-  let __setIntArray_func : L.llvalue =
-      L.declare_function "__setIntArray" __setIntArray_t the_module in
-
-  let __setFloArray_t : L.lltype =
-      L.function_type i32_t [|i32_t; array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
-  let __setFloArray_func : L.llvalue =
-      L.declare_function "__setFloArray" __setFloArray_t the_module in
-
-  let printIntArr_t : L.lltype =
-      L.function_type i32_t [| array3_i32_t ; i32_t ; i32_t ; i32_t |] in
-  let printIntArr_func : L.llvalue =
-      L.declare_function "printIntArr" printIntArr_t the_module in
-
-  let printFloatArr_t : L.lltype =
-      L.function_type i32_t [| array3_float_t ; i32_t ; i32_t ; i32_t |] in
-  let printFloatArr_func : L.llvalue =
-      L.declare_function "printFloatArr" printFloatArr_t the_module in
-  
-  let printCharArr_t : L.lltype =
-      L.function_type i32_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
-  let printCharArr_func : L.llvalue =
-      L.declare_function "printCharArr" printCharArr_t the_module in
-
-  let matMul_t : L.lltype = 
-      L.function_type i32_t [| array2_float_t ; array2_float_t ; array2_float_t;
-                               i32_t ; i32_t ; i32_t|] in
-  let matMul_func: L.llvalue = 
-      L.declare_function "matMul" matMul_t the_module in
-      
-  let aveFilter_t : L.lltype = 
-      L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
-                               i32_t ; i32_t ; i32_t|] in
-  let aveFilter_func: L.llvalue = 
-      L.declare_function "aveFilter" aveFilter_t the_module in
-      
-  let edgeDetection_t : L.lltype = 
-      L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
-                               i32_t ; i32_t ; i32_t|] in
-  let edgeDetection_func: L.llvalue = 
-      L.declare_function "edgeDetection" edgeDetection_t the_module in
       
 
   let int_format_str = L.const_bitcast 
@@ -363,10 +407,8 @@ let translate program =
           | 1 -> [|List.hd l ; 0 ; 0|]
           | 2 -> [|List.nth l 0 ;  List.nth l 1 ; 0 |]
           | 3 -> [|List.nth l 0 ;  List.nth l 1 ; List.nth l 2 |]
-          | _ -> raise(Failure("internal error: extract dimension for zero dimension")))
-      | A.Mat(x,y) -> [|x ; y ; 0|]
-      | A.Img(x,y,z) -> [|x ; y ; z|]
-      | _ -> raise(Failure("internal error: extract dimension for non array type"))
+          | _ -> raise(InternalError("extract dimension for zero dimension")))
+      | _ -> raise(InternalError("extract dimension for non array type"))
     in
 
     let lookup m n = try StringMap.find n m
@@ -409,55 +451,44 @@ let translate program =
         let slice = copy_slice tmp_orig (List.tl index_l) (vars, builder) false in
         ignore(L.build_store slice des builder);
         copy_slice_helper3 new_res new_des (n-1) index_l (vars, builder)
-      ) 
+      )
 
-    and copy_slice orig index_l (vars, builder) down = match (List.length index_l) with
-      | 1 -> (
+    and copy_slice_opt orig index_l (vars, builder) down = 
+      let ltyp = L.type_of orig in
+      if ltyp = mat_t then
+        let (a,_) = List.hd index_l
+        and (b,_) = List.nth index_l 1 in
+        let a' = expr (vars, builder) a
+        and b' = expr (vars, builder) b in
+        L.build_call __returnMatVal_func [| orig; a'; b'|] "" builder
+      else if ltyp = img_t then
+        let (a,_) = List.hd index_l
+        and (b,_) = List.nth index_l 1
+        and (c,_) = List.nth index_l 2 in
+        let a' = expr (vars, builder) a
+        and b' = expr (vars, builder) b 
+        and c' = expr (vars, builder) c in
+        L.build_call __returnImgVal_func [| orig; a'; b'; c'|] "" builder
+      else copy_slice orig index_l (vars, builder) true
+
+    and copy_slice orig index_l (vars, builder) down =
         let (a,b) = List.hd index_l in
         let len = match a,b with
           | (_,SId(_)),(_,SId(_)) -> 1
           | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1 
-          | _ -> raise(Failure("internal error: slicing has wrong type")) in
+          | _ -> raise(InternalError("slicing has wrong type")) in
         let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
 
         let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in  
         let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
         let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
-        ignore(copy_eles res des len (vars, builder));
+        ignore(match (List.length index_l) with
+          | 1 -> copy_eles res des len (vars, builder)
+          | 2 -> copy_slice_helper2 res des len index_l (vars, builder)
+          | 3 -> copy_slice_helper3 res des len index_l (vars, builder)
+          | _ -> raise(InternalError("slcing should not be empty")));
         if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
         else des
-      )
-      | 2 -> (
-        let (a,b) = List.hd index_l in
-        let len = match a,b with
-          | (_,SId(_)),(_,SId(_)) -> 1
-          | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1
-          | _ -> raise(Failure("internal error: slicing has wrong type")) in
-        let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
-
-        let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
-        let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
-        let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
-        ignore(copy_slice_helper2 res des len index_l (vars, builder));
-        if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
-        else des
-      )
-      | 3 -> (
-        let (a,b) = List.hd index_l in
-        let len = match a,b with
-          | (_,SId(_)),(_,SId(_)) -> 1
-          | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1
-          | _ -> raise(Failure("internal error: slicing has wrong type")) in
-        let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
-
-        let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in
-        let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
-        let des = L.build_bitcast des_tmp (L.type_of res) "3dtmp" builder in
-        ignore(copy_slice_helper3 res des len index_l (vars, builder));
-        if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
-        else des
-      )
-      | _ -> raise (Failure "internal error: slicing list shoule not be empty")
 
 
     and getmember (ptr,local_vars,builder) (se1, se2) =
@@ -472,11 +503,11 @@ let translate program =
             let src = L.build_load (lookup local_vars s) "tmp" builder in
             (L.build_in_bounds_gep src [| pos |] "tmp" builder,s)
           | SGetMember(e1, e2) -> getmember (true, local_vars, builder) (e1, e2)
-          | _ -> raise(Failure "internal error: getmember error"))
+          | _ -> raise(InternalError("accessing non struct member")))
         in
         let bind_l = match ty with
           | A.Struct(_, lst) -> lst
-          | _ -> raise(Failure "internal error: getmember error")
+          | _ -> raise(InternalError("accessing non struct member"))
         in
         let list_pos s lst =
           let meet = ref 0 in
@@ -491,7 +522,7 @@ let translate program =
         let pos = match se2 with
           | (_,SId(s)) -> list_pos s bind_l
           | (_,SSlice(s,_)) -> list_pos s bind_l
-          | _ -> raise(Failure "internal error: getmember error")
+          | _ -> raise(InternalError("accessing wrong struct member"))
         in
         let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "tmp" builder in
         let deref_ptr ptr (a,_) =
@@ -506,13 +537,33 @@ let translate program =
             | A.Array(_) -> if !isPtr = true then p else
               let orig = L.build_load p "tmp" builder in
               ignore(isPtr := true);
-              copy_slice orig l (local_vars, builder) true
+              copy_slice_opt orig l (local_vars, builder) true
             | _ -> List.fold_left deref_ptr p l)
-          | _ -> raise(Failure "internal error: getmember error")
+          | _ -> raise(InternalError("getmember error"))
         in
 
         if !isPtr = true then (final, n)
         else (L.build_load final "tmp" builder, n)
+
+    and set_slice_opt (local_vars, builder) (dst, index_l, re) ty = 
+      let ltyp = L.type_of dst in
+      if ltyp = mat_t then
+        let e' = expr (local_vars, builder) re in
+        let (a,_) = List.hd index_l
+        and (b,_) = List.nth index_l 1 in
+        let a' = expr (local_vars, builder) a
+        and b' = expr (local_vars, builder) b in
+        L.build_call __setMatVal_func [| e'; dst; a'; b'|] "" builder
+      else if ltyp = img_t then
+        let e' = expr (local_vars, builder) re in
+        let (a,_) = List.hd index_l
+        and (b,_) = List.nth index_l 1
+        and (c,_) = List.nth index_l 2 in
+        let a' = expr (local_vars, builder) a
+        and b' = expr (local_vars, builder) b 
+        and c' = expr (local_vars, builder) c in
+        L.build_call __setImgVal_func [| e'; dst; a'; b'; c'|] "" builder
+      else set_slice (local_vars, builder) (dst, index_l, re) ty 
 
     and set_slice (local_vars, builder) (dst, lst, re) ty = 
        let create_ptr c builder =
@@ -523,18 +574,13 @@ let translate program =
 
         let extDim1 = function
           | A.Array(_) as arr -> let (_, n) = arr_type_helper arr in n
-          | A.Mat(1,_) -> 1
-          | A.Mat(_,_) -> 2
-          | A.Img(1,1,_) -> 1
-          | A.Img(1,_,_) -> 2
-          | A.Img(_,_,_) -> 3
           | _ -> 1
         in
 
         let (t, _) = re in
         let dimdiff = L.const_int i32_t ((List.length lst) - (extDim1 t)) in
         let isComType = function
-          | A.Int | A.Float | A.Mat(1,1) | A.Img(1,1,1) -> true
+          | A.Int | A.Float -> true
           | _ -> false in
         let res_tmp = expr (local_vars, builder) re in
         let res = if isComType t then create_ptr res_tmp builder
@@ -546,15 +592,42 @@ let translate program =
         let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
         let (ty, _) = arr_type_helper ty in
         (match ty with
-          | A.Int | A.Img(_) ->
+          | A.Int ->
             let res' = L.build_bitcast res array3_i32_t "res" builder
             and des' = L.build_bitcast dst array3_i32_t "des" builder in
             L.build_call __setIntArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
-          | A.Float | A.Mat(_) -> 
+          | A.Float -> 
             let res' = L.build_bitcast res array3_float_t "res" builder
             and des' = L.build_bitcast dst array3_float_t "des" builder in
             L.build_call __setFloArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
-          | _ as t -> raise(Failure(A.string_of_typ t ^ " type does not support slicing copy")))
+          | _ as t -> raise(InternalError(A.string_of_typ t ^ " type does not support slicing copy")))
+
+
+    and call_print (local_vars, builder) e =
+      let e' = expr(local_vars, builder) e
+      and (t, _) = e in
+      match t with
+        | A.Mat -> L.build_call __printMat_func [| e' |] "" builder
+        | A.Img -> raise NotImplemented
+        | A.Array(_) when get_type_arr t = A.Int ->
+          let (t,_) = e in
+          let ar = extDim t in
+          let des = L.build_bitcast e' array3_i32_t "tmp" builder in
+          L.build_call __printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+          "" builder
+        | A.Array(_) when get_type_arr t = A.Float ->
+          let (t,_) = e in
+          let ar = extDim t in
+          let des = L.build_bitcast e' array3_float_t "tmp" builder in
+          L.build_call __printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+          "" builder
+        | A.Array(_) when get_type_arr t = A.Char ->
+          let (t,_) = e in
+          let ar = extDim t in
+          let des = L.build_bitcast e' array3_i8_t "tmp" builder in
+          L.build_call __printCharArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
+          "" builder
+        | _ -> L.build_call __printf_func [| ty_to_format e ; e' |] "" builder
 
 
     (* Construct code for an expression; return its value *)
@@ -578,7 +651,7 @@ let translate program =
         ptr
       | SSlice(d, index_l) ->
         let orig = L.build_load (lookup local_vars d) d builder in
-        copy_slice orig index_l (local_vars, builder) true
+        copy_slice_opt orig index_l (local_vars, builder) true
       | SNoexpr     -> L.const_int i32_t 0
       | SId s       -> L.build_load (lookup local_vars s) s builder
       | SGetMember (se1, se2) ->
@@ -587,7 +660,7 @@ let translate program =
       | SStructAssign(se1, se2) -> 
         let (se1', se2') = (match se1 with
           | (_,SGetMember(a,b)) -> (a,b)
-          | _ -> raise (Failure "internal error: struct assign")) in
+          | _ -> raise (InternalError("internal error: struct assign"))) in
         let (des, _) = getmember (true, local_vars, builder) (se1', se2') in
 
         (match ty,se2' with
@@ -601,7 +674,7 @@ let translate program =
                           ignore(L.build_store e' (lookup local_vars s) builder); e'
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
-        set_slice (local_vars, builder) (des, lst, e) ty 
+        set_slice_opt (local_vars, builder) (des, lst, e) ty 
 
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
@@ -618,7 +691,7 @@ let translate program =
     | A.Greater -> L.build_fcmp L.Fcmp.Ogt
     | A.Geq     -> L.build_fcmp L.Fcmp.Oge
     | A.And | A.Or | A.Mod | A.Pow->
-        raise (Failure "internal error: semant should have rejected and/or on float")
+        raise (InternalError "internal error: semant should have rejected and/or on float")
     ) e1' e2' "tmp" builder
       | SBinop (e1, op, e2) ->
     let e1' = expr (local_vars, builder) e1
@@ -637,7 +710,7 @@ let translate program =
     | A.Leq     -> L.build_icmp L.Icmp.Sle
     | A.Greater -> L.build_icmp L.Icmp.Sgt
     | A.Geq     -> L.build_icmp L.Icmp.Sge
-    | A.Pow     ->  raise (Failure "internal error: Power for int not supported yet")
+    | A.Pow     ->  raise (InternalError "internal error: Power for int not supported yet")
     ) e1' e2' "tmp" builder
       | SUnop(op, ((t, _) as e)) ->
           let e' = expr (local_vars, builder) e in
@@ -646,32 +719,7 @@ let translate program =
     | A.Neg                  -> L.build_neg
     | A.Not                  -> L.build_not) e' "tmp" builder
       | SCall ("print", [e]) ->
-        L.build_call printf_func [| ty_to_format e ; (expr (local_vars, builder) e) |]
-        "printf" builder
-      | SCall ("printbig", [e]) ->
-    L.build_call printbig_func [| (expr (local_vars, builder) e) |] "printbig" builder
-      | SCall ("printIntArr", [e]) ->
-        let e' = expr (local_vars, builder) e in
-        let (t,_) = e in
-        let ar = extDim t in
-        let des = L.build_bitcast e' array3_i32_t "tmp" builder in
-        ignore(L.dump_module the_module);
-        L.build_call printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-        "printIntArr" builder
-      | SCall ("printCharArr", [e]) ->
-        let e' = expr (local_vars, builder) e in
-        let (t,_) = e in
-        let ar = extDim t in
-        let des = L.build_bitcast e' array3_i8_t "tmp" builder in
-        L.build_call printCharArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-        "printCharArr" builder
-      | SCall ("printFloatArr", [e]) ->
-        let e' = expr (local_vars, builder) e in
-        let (t,_) = e in
-        let ar = extDim t in
-        let des = L.build_bitcast e' array3_float_t "tmp" builder in
-        L.build_call printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-        "printFloatArr" builder
+        call_print (local_vars, builder) e
       | SCall ("matMul", [e1;e2;e3]) ->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in
@@ -696,7 +744,7 @@ let translate program =
             L.const_int i32_t ar1.(1); L.const_int i32_t ar1.(2) ; v3 |] "aveFilter" builder
         | SCall ("edgeDetection",_) -> L.build_call edgeDetection_func [| des1; des2; L.const_int i32_t ar1.(0);
             L.const_int i32_t ar1.(1); L.const_int i32_t ar1.(2) ; v3 |] "edgeDetection" builder
-        | _ -> raise(Failure("internel error: unsupported function detected")))
+        | _ -> raise(InternalError("internel error: unsupported function detected")))
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
    let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in
@@ -792,7 +840,7 @@ let translate program =
         let lst_ty = List.rev tmp in
         ignore(List.map (store_helper builder des) lst_ty);
         des
-      | _ -> raise(Failure("internal error: type can not be initialized: " ^ A.string_of_typ t))
+      | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
     and gen_type_list l t n =
       if n = 0 then l

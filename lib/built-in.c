@@ -1,104 +1,118 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-struct image {
+struct img {
 	int row;
 	int col;
 	/* channel num is 3 by default */
-	int*** img;
+	int*** data;
 };
 
-struct mat_double {
+struct mat {
 	int row;
 	int col;
-	
-	double** mat;
+	double** data;
 };
 
-struct mat_int {
-	int row;
-	int col;
-	
-	int** mat;
-};
+// struct mat_int {
+// 	int row;
+// 	int col;
+// 	int** mat;
+// };
 
-struct image* malloc_img(int row, int col) {
-	struct image* i = (struct image*) malloc(sizeof(struct image));
+
+void printMat(struct mat* a) {
+	printf("%d %d \n", a->row, a->col);
+	for (int i = 0; i < a->row; i++) {
+		for (int j = 0; j < a->col; j++)
+			printf("%lf ", a->data[i][j]);
+		printf("\n");
+	}
+}
+
+float __returnMatVal(struct mat* a, int r, int c) {
+	return a->data[r][c];
+}
+
+int __returnImgVal(struct img* a, int ch, int r, int c) {
+	return a->data[ch][r][c];
+}
+
+void __setMatVal(double val, struct mat* a, int r, int c) {
+	a->data[r][c] = val;
+}
+
+void __setImgVal(int val, struct img* a, int ch, int r, int c) {
+	a->data[ch][r][c] = val;
+}
+
+
+struct img* malloc_img(int row, int col) {
+	struct img* i = (struct img*) malloc(sizeof(struct img));
 	const int chn = 3;
 	i -> row = row;
 	i -> col = col;
-	i -> img = (int***) malloc(sizeof(int**) * row);
+	i -> data = (int***) malloc(sizeof(int**) * row);
 	for (int r = 0; r < row; r++) {
-		i -> img[r] = (int**) malloc(sizeof(int*) * col);
+		i -> data[r] = (int**) malloc(sizeof(int*) * col);
 		for (int c = 0; c < col; c++) {
-			i -> img[r][c] = (int*) malloc(sizeof(int) * chn);
+			i -> data[r][c] = (int*) malloc(sizeof(int) * chn);
 		}
 	}
 
 	return i;
 }
 
-struct mat_double* malloc_mat_double(int row, int col) {
-	struct mat_double* m = (struct mat_double*) malloc(sizeof(struct mat_double));
+
+struct mat* malloc_mat(int row, int col) {
+	struct mat* m = (struct mat*) malloc(sizeof(struct mat));
 	m -> row = row;
 	m -> col = col;
-	m -> mat = (double**) malloc(sizeof(double*) * row);
+	m -> data = (double**) malloc(sizeof(double*) * row);
 	for (int r = 0; r < row; r++) {
-		m -> mat[r] = (double*) malloc(sizeof(double) * col);
+		m -> data[r] = (double*) malloc(sizeof(double) * col);
 	}
 
 	return m;
 }
 
-
-struct mat_int* malloc_mat_int(int row, int col) {
-	struct mat_int* m = (struct mat_int*) malloc(sizeof(struct mat_int));
-	m -> row = row;
-	m -> col = col;
-	m -> mat = (int**) malloc(sizeof(int*) * row);
-	for (int r = 0; r < row; r++) {
-		m -> mat[r] = (int*) malloc(sizeof(int) * col);
-	}
-
-	return m;
-}
-
-void free_img(struct image* i) {
+void free_img(struct img* i) {
 	const int row = i -> row;
 	const int col = i -> col;
 	const int ch = 3;
 
 	for (int r = row - 1; r >= 0; r--) {
 		for (int c = col - 1; c >= 0; c--) {
-			free(i -> img[r][c]);
+			free(i -> data[r][c]);
 		}
-		free(i -> img[r]);
+		free(i -> data[r]);
 	}
-	free(i -> img);
+	free(i -> data);
 	free(i);
 }
 
-void free_mat_double(struct mat_double* m) {
+void free_mat(struct mat* m) {
 	const int row = m -> row;
 	const int col = m -> col;
 
 	for (int r = 0; r < row; r++) {
-		free(m -> mat[r]);
+		free(m -> data[r]);
 	}
-	free(m -> mat);
+	free(m -> data);
 	free(m);	
 }
 
-void free_mat_int(struct mat_int* m) {
-	const int row = m -> row;
-	const int col = m -> col;
+// void free_mat_int(struct mat_int* m) {
+// 	const int row = m -> row;
+// 	const int col = m -> col;
 
-	for (int r = 0; r < row; r++) {
-		free(m -> mat[r]);
-	}
-	free(m -> mat);
-	free(m);	
-}
+// 	for (int r = 0; r < row; r++) {
+// 		free(m -> mat[r]);
+// 	}
+// 	free(m -> mat);
+// 	free(m);	
+// }
 
 int __setIntArray(int diff, int*** d, int*** r, int depth, int* s_info) {
 	if (depth == 1) {
@@ -213,7 +227,7 @@ int __setFloArray(int diff, double*** d, double*** r, int depth, int* s_info) {
 	}
 }
 
-void printFloatArr(double*** start, int row, int col, int layer) {
+void __printFloatArr(double*** start, int row, int col, int layer) {
 	
 	if (layer == 0 && col == 0) {
 		double* ptr = (void*) start;
@@ -263,7 +277,7 @@ void printFloatArr(double*** start, int row, int col, int layer) {
 	printf("\n");
 }
 
-void printIntArr(int*** start, int row, int col, int layer) {
+void __printIntArr(int*** start, int row, int col, int layer) {
 	if (layer == 0 && col == 0) {
 		int* ptr = (void*) start;
 		printf("[");
@@ -312,7 +326,7 @@ void printIntArr(int*** start, int row, int col, int layer) {
 	printf("\n");
 }
 
-void printCharArr(char*** start, int row, int col, int layer) {
+void __printCharArr(char*** start, int row, int col, int layer) {
 	if (layer == 0 && col == 0) {
 		char* ptr = (void*) start;
 		printf("[");
@@ -361,102 +375,103 @@ void printCharArr(char*** start, int row, int col, int layer) {
 	printf("\n");
 }
 
-struct mat_double* matMul_double(struct mat_double* m1, struct mat_double* m2) {
-	/* 
-	please make sure the dimension is correct before input parameters
-	A(dim1, dim2) and B(dim2, dim3) are input matrices,
-	C(dim2, dim3) are output matrix
-	*/
-	const int dim1 = m1 -> row;
-	const int dim2 = m1 -> col;
-	const int dim3 = m2 -> col;
+
+// struct mat_double* matMul_double(struct mat_double* m1, struct mat_double* m2) {
+// 	/* 
+// 	please make sure the dimension is correct before input parameters
+// 	A(dim1, dim2) and B(dim2, dim3) are input matrices,
+// 	C(dim2, dim3) are output matrix
+// 	*/
+// 	const int dim1 = m1 -> row;
+// 	const int dim2 = m1 -> col;
+// 	const int dim3 = m2 -> col;
 	
-	struct mat_double* m3 = malloc_mat_double(dim1, dim3);
+// 	struct mat_double* m3 = malloc_mat_double(dim1, dim3);
 	
-	for (int i = 0; i < dim1; i++) {
-		for (int j = 0; j < dim3; j++) {
-			/* C[i][j] = A[i][:] .* B[:][j] */
-			for (int k = 0; k < dim2; k++)
-				m3 -> mat[i][j] += m1 -> mat[i][k] * m2 -> mat[k][j];
-		}
-	}
-	return m3;
-}
+// 	for (int i = 0; i < dim1; i++) {
+// 		for (int j = 0; j < dim3; j++) {
+// 			/* C[i][j] = A[i][:] .* B[:][j] */
+// 			for (int k = 0; k < dim2; k++)
+// 				m3 -> mat[i][j] += m1 -> mat[i][k] * m2 -> mat[k][j];
+// 		}
+// 	}
+// 	return m3;
+// }
 
-struct image* aveFilter(struct image* imgIn, int fWidth) {
-	/*
-	Input a imgIn(row, col, layer), implement average filter of
-	 a radius of fWidth. The output is imgOut.
+// struct image* aveFilter(struct image* imgIn, int fWidth) {
+// 	/*
+// 	Input a imgIn(row, col, layer), implement average filter of
+// 	 a radius of fWidth. The output is imgOut.
 
-	e.g. filter width = 1, then we use 3 x 3 filter
-	     filter width = 2, then we use 5 x 5 filter
-	*/
+// 	e.g. filter width = 1, then we use 3 x 3 filter
+// 	     filter width = 2, then we use 5 x 5 filter
+// 	*/
 
-	const int row = imgIn -> row;
-	const int col = imgIn -> col;
-	const int layer = 3;
+// 	const int row = imgIn -> row;
+// 	const int col = imgIn -> col;
+// 	const int layer = 3;
 	
-	struct image* imgOut = malloc_img(row, col);
+// 	struct image* imgOut = malloc_img(row, col);
 
-	for (int i = 0; i < row; i++) {
-		for (int j = 0; j < col; j++) {
-			for (int k = 0; k < layer; k++) {
-				/* for each pixel in each channel, do average */
-				int count = 0;
-				int sum = 0;
-				for (int m = -fWidth; m <= fWidth; m++) {
-					for (int n = -fWidth; n <= fWidth; n++) {
-						if (i + m >= 0 && i + m < row - 1
-							&& j + n >= 0 && j + n < col - 1) {
-							count++;
-							sum += imgIn -> img[i + m][j + n][k];
-						}
-					}
-				}
-				int aveResult = sum / count;
-				imgOut -> img[i][j][k] = aveResult;
-			}
-		}
-	}
-	return imgOut;
-}
+// 	for (int i = 0; i < row; i++) {
+// 		for (int j = 0; j < col; j++) {
+// 			for (int k = 0; k < layer; k++) {
+// 				/* for each pixel in each channel, do average */
+// 				int count = 0;
+// 				int sum = 0;
+// 				for (int m = -fWidth; m <= fWidth; m++) {
+// 					for (int n = -fWidth; n <= fWidth; n++) {
+// 						if (i + m >= 0 && i + m < row - 1
+// 							&& j + n >= 0 && j + n < col - 1) {
+// 							count++;
+// 							sum += imgIn -> img[i + m][j + n][k];
+// 						}
+// 					}
+// 				}
+// 				int aveResult = sum / count;
+// 				imgOut -> img[i][j][k] = aveResult;
+// 			}
+// 		}
+// 	}
+// 	return imgOut;
+// }
 
-struct image* edgeDetection(struct image* imgIn, int threshold) {
-	//use 3 x 3 filter for edge detection
-	const int row = imgIn -> row;
-	const int col = imgIn -> col;
-	const int layer = 3;
+// struct image* edgeDetection(struct image* imgIn, int threshold) {
+// 	//use 3 x 3 filter for edge detection
+// 	const int row = imgIn -> row;
+// 	const int col = imgIn -> col;
+// 	const int layer = 3;
 
-	struct image* imgOut = malloc_img(row, col);
-	for (int i = 0; i < row; i++) {
-		for (int j = 0; j < col; j++) {
-			// for the edge of the input image, we simply ignore them 
-			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
-				for (int k = 0; k < layer; k++)
-					imgOut -> img[i][j][k] = 0;
-			}
-			// else, we compute the gradients and judge if it is edge
-			else {
-				float gradSum = 0; // total gradients
-				for (int k = 0; k < layer; k++) {
-					gradSum += abs(8 * imgIn -> img[i][j][k] 
-							- imgIn -> img[i - 1][j - 1][k] - imgIn -> img[i - 1][j][k] - imgIn -> img[i - 1][j + 1][k]
-							- imgIn -> img[i][j - 1][k] - imgIn -> img[i][j + 1][k]
-							- imgIn -> img[i + 1][j - 1][k] - imgIn -> img[i + 1][j][k] - imgIn -> img[i + 1][j + 1][k]);
-				}
-				//printf("%f\n",gradSum);
-				gradSum /= layer;
-				if (gradSum >= threshold) {
-					for (int k = 0; k < layer; k++)
-						imgOut -> img[i][j][k] = imgIn -> img[i][j][k];
-				}
-				else {
-					for (int k = 0; k < layer; k++)
-						imgOut -> img[i][j][k] = 0;
-				}
-			}
-		}
-	}
-	return imgOut;
-}
+// 	struct image* imgOut = malloc_img(row, col);
+// 	for (int i = 0; i < row; i++) {
+// 		for (int j = 0; j < col; j++) {
+// 			// for the edge of the input image, we simply ignore them 
+// 			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
+// 				for (int k = 0; k < layer; k++)
+// 					imgOut -> img[i][j][k] = 0;
+// 			}
+// 			// else, we compute the gradients and judge if it is edge
+// 			else {
+// 				float gradSum = 0; // total gradients
+// 				for (int k = 0; k < layer; k++) {
+// 					gradSum += abs(8 * imgIn -> img[i][j][k] 
+// 							- imgIn -> img[i - 1][j - 1][k] - imgIn -> img[i - 1][j][k] - imgIn -> img[i - 1][j + 1][k]
+// 							- imgIn -> img[i][j - 1][k] - imgIn -> img[i][j + 1][k]
+// 							- imgIn -> img[i + 1][j - 1][k] - imgIn -> img[i + 1][j][k] - imgIn -> img[i + 1][j + 1][k]);
+// 				}
+// 				//printf("%f\n",gradSum);
+// 				gradSum /= layer;
+// 				if (gradSum >= threshold) {
+// 					for (int k = 0; k < layer; k++)
+// 						imgOut -> img[i][j][k] = imgIn -> img[i][j][k];
+// 				}
+// 				else {
+// 					for (int k = 0; k < layer; k++)
+// 						imgOut -> img[i][j][k] = 0;
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return imgOut;
+// }
 

@@ -8,6 +8,7 @@ module StringMap = Map.Make(String)
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong.
    Check each global variable, then check each function *)
+exception NotImplemented
 
 let check program =
 
@@ -142,11 +143,11 @@ let check program =
       | Mat,2 -> 
         let l' = List.map check_slice_expr l in
         ignore(List.map check_equal l');
-        (Float, SGetMember((Mat, SId(n)), (Float, SSlice("data", l'))))
+        (Float, SSlice(n, l'))
       | Img,3 ->
         let l' = List.map check_slice_expr l in
         ignore(List.map check_equal l');
-        (Int, SGetMember((Img, SId(n)), (Int, SSlice("data", l'))))
+        (Int, SSlice(n, l'))
       | Array(_),sn when (array_dim 0 ty) >= sn ->
         let actual_n = array_dim 0 ty in
         let l' = List.map check_slice_expr (expand_slice l actual_n) in
@@ -169,7 +170,6 @@ let check program =
     let sarr1 = List.map (check_expr (v,f)) arr1 in
     check_list_type sarr1
 
-
    (*  check struct access expresion recursively*)
   and check_struct_access (vars, funcs) e1 e2 =
     let (lt, e1') = check_expr (vars, funcs) e1 in
@@ -185,8 +185,10 @@ let check program =
       | Slice(s,l) when List.exists (fun (_,n) -> n = s) mem_list -> 
         let (ty, name) = List.find (fun (_,n) -> n = s) mem_list in
         (match ty with
-          | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) -> (ty, SGetMember((lt,e1'), (ty, SSlice(sn, [((Int, SLiteral(-1)), (Int, SLiteral(-1)))]))) )
-          | _ -> let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
+          | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) -> 
+            let (rt, re) = check_expr (vars, funcs) e2 in
+            (ty, SGetMember((lt,e1'), (rt, re)))
+          | _ -> let (rt, re) = check_expr (vars, funcs) e2 in
             (rt, SGetMember((lt, e1') ,(rt, re))))
       | Id(s) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
       | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
@@ -258,21 +260,7 @@ let check program =
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
         in (ty, SBinop((t1, e1'), op, (t2, e2')))
     | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
-    | Call("printFloatArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
-      (match ty with
-        | Array(_) as arr_t when get_type_arr arr_t = Float -> (Void, SCall("printFloatArr", [(ty,e')]))
-(*         | Mat(_) -> (Void, SCall("printFloatArr", [(ty,e')])) *)
-        | _ -> raise(Failure("illegal argument in printFloatArr")))
-    | Call("printIntArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
-      (match ty with
-        | Array(_) as arr_t when get_type_arr arr_t = Int -> (Void, SCall("printIntArr", [(ty,e')]))
-(*         | Img(_) -> (Void, SCall("printIntArr", [(ty,e')])) *)
-        | _ -> raise(Failure("illegal argument in printIntArr")))
-    | Call("printCharArr", [e]) -> let (ty, e') = check_expr (var_symbols, func_symbols) e in
-      (match ty with
-        | Array(_) as arr_t when get_type_arr arr_t = Char -> (Void, SCall("printCharArr", [(ty,e')]))
-        | _ -> raise(Failure("illegal argument in printIntArr")))
-    | Call("matMul", [e1;e2;e3]) -> raise(Failure("matmul here"))
+    | Call("matMul", [e1;e2;e3]) -> raise NotImplemented
 (*       let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
       let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
       let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
@@ -405,12 +393,11 @@ let check program =
       formals = collect_formals l;
       body = [] } map
     in List.fold_left add_bind StringMap.empty [
-                               (Void, "printbig", [Int]);
                                (Void, "print", [Int]);
-                               (Void, "printFloatArr", [Array(Float, 1)]);
-                               (Void, "printIntArr", [Array(Int, 1)]);
                                (Mat, "malloc_mat", [Int; Int]);
-                               (Img, "malloc_img", [Int; Int])]
+                               (Img, "malloc_img", [Int; Int]);
+                               (Void, "free_mat", [Mat]);
+                               (Void, "free_img", [Img])]
   in
 
   (**** Add func to func_symbols with error handler ****)
