@@ -1,17 +1,19 @@
-struct test{
-	int b[5];
+
+struct test {
+	int a;
 };
 
-
+struct test test_f(struct test tmp) {
+	tmp.a = 2;
+	return tmp;
+}
 int main() {	
+	struct test me;
+	me.a = 1;
 
-	mat a(5,5);
-
-	a[0][0] = 1.;
-
-	print(a);
-
-	free_mat(a);
-
+	struct test notme;
+	notme = test_f(me);
+	print(me.a);
+	print(notme.a);
 	return 0;
 }

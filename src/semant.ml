@@ -401,19 +401,44 @@ let check program =
   in
 
   (**** Add func to func_symbols with error handler ****)
-  let add_func map fd = 
+  let add_func (var_symbols, map) fd = 
     let built_in_err = "function " ^ fd.fname ^ " may not be defined"
     and dup_err = "duplicate function " ^ fd.fname
     and make_err er = raise (Failure er)
     and n = fd.fname
     in
+    let fixed_typ = (match fd.typ with
+      | Struct(name,_) -> type_of_identifier var_symbols name
+      | Array(t,_) -> (match get_type_arr t with
+        | Struct(name,_) -> raise NotImplemented
+        | _ -> fd.typ)
+      | _ -> fd.typ)
+    in 
+    let fixed_formals =
+      let fix_formal (ty, tmp1, tmp2) = (match ty with
+        | Struct(name,_) -> 
+          let new_ty = type_of_identifier var_symbols name in
+          (new_ty, tmp1, tmp2)
+        | Array(t,_) -> (match get_type_arr t with
+          | Struct(name,_) -> raise NotImplemented
+          | _ -> (ty, tmp1, tmp2))
+        | _ -> (ty, tmp1, tmp2))
+      in List.map fix_formal fd.formals
+    in
+    let fd_new = {
+      typ = fixed_typ;
+      fname = fd.fname;
+      formals = fixed_formals;
+      body = fd.body;
+    } 
+    in
     let res = StringMap.mem n map
-    in match fd with
+    in match fd_new with
       _ when StringMap.mem n built_in_decls -> make_err built_in_err
-    | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd map 
-    | _ when res && (let f = StringMap.find n map in (f.body <> [] && fd.body <> [])) -> make_err dup_err
+    | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd_new map 
+    | _ when res && (let f = StringMap.find n map in (f.body <> [] && fd_new.body <> [])) -> make_err dup_err
     (*        | _ when StringMap.mem n map -> make_err dup_err   *)
-    | _ ->  StringMap.add n fd map 
+    | _ ->  StringMap.add n fd_new map 
   in
 
   (* Check each function *)
@@ -532,9 +557,10 @@ let check program =
     | Globaldcl((_, id, _) as d) -> let dcl = check_dcl (var_symbols, func_symbols) d true in
       let (t,_,_) = dcl in
       ((StringMap.add id t var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
-    | Func(f) -> let new_func_symbols = add_func func_symbols f in
-      (var_symbols, new_func_symbols, (check_function (var_symbols, new_func_symbols) f) :: prog_sast)
-    | Func_dcl(f) -> let new_func_symbols = add_func func_symbols f in
+    | Func(f) -> let new_func_symbols = add_func (var_symbols, func_symbols) f in
+      (var_symbols, new_func_symbols, 
+        (check_function (var_symbols, new_func_symbols) (find_func new_func_symbols f.fname)) :: prog_sast)
+    | Func_dcl(f) -> let new_func_symbols = add_func (var_symbols, func_symbols) f in
       (var_symbols, new_func_symbols, prog_sast)
     | Struct_dcl(dcl) -> let (ty, sdcl) = check_struct (var_symbols, func_symbols) dcl in
       ((StringMap.add (fst ty) (Struct(ty)) var_symbols), func_symbols, sdcl :: prog_sast)

@@ -140,6 +140,17 @@ and string_of_typ = function
   | Array(_, _) as arr -> string_of_dim "" arr 
   | Struct(n,_) -> "struct " ^ n
 
+and string_of_typ_debug = function
+    Int -> "int"
+  | Bool -> "bool"
+  | Float -> "float"
+  | Char -> "char"
+  | String -> "string"
+  | Void -> "void"
+  | Mat -> "mat"
+  | Img -> "img"
+  | Array(_, _) as arr -> string_of_dim "" arr 
+  | Struct(n,l) -> "struct " ^ n ^ "\n" ^ String.concat " " (List.map (fun (ty, str) -> string_of_typ_debug ty ^ " " ^ str) l) ^ "\n"
 
 let string_of_combind (t, id, expr) = match expr with
   | Noexpr -> string_of_typ t ^ " " ^ id ^ ";\n"
