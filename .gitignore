@@ -5,4 +5,11 @@
 *.exe
 *.app
 
+
+
+._d/
+._ncdi/
+src/
+lib/
+
 *.native

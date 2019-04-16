@@ -497,7 +497,6 @@ let translate program =
       let (des, n) = (match exp with
           | SId(s) -> (lookup local_vars s, s)
           | SSlice(s, l) ->
-            (* Not working now *)
             let (a,_) = List.hd l in
             let pos = expr (local_vars, builder) a in
             let src = L.build_load (lookup local_vars s) "tmp" builder in
