@@ -72,6 +72,7 @@ let translate program =
   let structs = List.rev (List.fold_left pick_struct [] program) in
 
 
+  (* generate struct type in struct map *)
   let struct_decls : (L.lltype * (A.typ * string) list) StringMap.t =
     let struct_decl m sdecl =
       let name = sdecl.sname in
@@ -322,6 +323,7 @@ let translate program =
   let globals = List.rev (List.fold_left pick_global_dcl [] program) in
 
 
+  (* zeroinitializer for globals *)
   let rec type_zeroinitializer t = match t with
     | A.Int | A.Bool -> L.const_int (ltype_of_typ t) 0
     | A.Float -> L.const_float (ltype_of_typ t) 0.0
@@ -360,7 +362,7 @@ let translate program =
     List.fold_left global_var StringMap.empty globals in
 
 
-
+    (* print format for printf linked function *)
   let int_format_str = L.const_bitcast 
       (L.define_global "fmt" (L.const_stringz context "%d\n") the_module) string_t
   and float_format_str = L.const_bitcast 
@@ -384,6 +386,7 @@ let translate program =
     let (the_function, _) = StringMap.find fdecl.sfname function_decls in
     let builder = L.builder_at_end context (L.entry_block the_function) in
 
+    (* construct formals *)
     let formal_vars : L.llvalue StringMap.t =
       let add_formal m (t, n, _) p =
         L.set_value_name n p;
@@ -400,6 +403,7 @@ let translate program =
       | _ -> l
     in
 
+    (* extract dimension of array as ocaml array*)
     let extDim = function
       | A.Array(_) as ty ->
         let l = List.rev (extDim_helper [] ty) in
@@ -415,6 +419,7 @@ let translate program =
       with Not_found -> StringMap.find n global_vars
     in
 
+    (* copy elements element by element *)
     let rec copy_eles res des n (vars, builder) =
       if n = 0 then ()
       else (
@@ -425,12 +430,13 @@ let translate program =
         copy_eles new_res new_des (n-1) (vars, builder)) 
     in
 
-
+    (* dereference pointer function *)
     let deref builder (des,prev) (a,b) =
       if a = b && prev then (L.build_load des "tmp" builder, true)
       else (des, false)
     in
 
+    (* copy elements element by element *)
     let rec copy_slice_helper2 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
@@ -442,6 +448,7 @@ let translate program =
         copy_slice_helper2 new_res new_des (n-1) index_l (vars, builder)
       )
 
+    (* copy elements element by element *)
     and copy_slice_helper3 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
@@ -453,6 +460,7 @@ let translate program =
         copy_slice_helper3 new_res new_des (n-1) index_l (vars, builder)
       )
 
+    (* copy slicing for rvalue compatible with mat/img *)
     and copy_slice_opt orig index_l (vars, builder) down = 
       let ltyp = L.type_of orig in
       if ltyp = mat_t then
@@ -471,6 +479,7 @@ let translate program =
         L.build_call __returnImgVal_func [| orig; a'; b'; c'|] "" builder
       else copy_slice orig index_l (vars, builder) true
 
+      (* copy slicing for array *)
     and copy_slice orig index_l (vars, builder) down =
       let (a,b) = List.hd index_l in
       let len = match a,b with
@@ -490,7 +499,7 @@ let translate program =
       if down then let (ret, _) = List.fold_left (deref builder) (des,true) index_l in ret
       else des
 
-
+    (* accessing struct member function *)
     and getmember (ptr,local_vars,builder) (se1, se2) =
       let (ty,exp) = se1 in
       (* The left part should be the type of struct with 1 dimension at most *)
@@ -544,6 +553,7 @@ let translate program =
       if !isPtr = true then (final, n)
       else (L.build_load final "tmp" builder, n)
 
+      (* set slicing value compatible with mat/img *)
     and set_slice_opt (local_vars, builder) (dst, index_l, re) ty = 
       let ltyp = L.type_of dst in
       if ltyp = mat_t then
@@ -602,6 +612,7 @@ let translate program =
        | _ as t -> raise(InternalError(A.string_of_typ t ^ " type does not support slicing copy")))
 
 
+      (* group all print function into one *)
     and call_print (local_vars, builder) e =
       let e' = expr(local_vars, builder) e
       and (t, _) = e in
@@ -812,6 +823,7 @@ let translate program =
                                      ( SBlock [SStmt(SExpr e1) ; SStmt(SWhile (e2, SBlock [SStmt(body) ; SStmt(SExpr e3)])) ] )
 
 
+    (* zeroinitializer for local vars *)
     and local_type_zeroinitializer des builder t = match t with
       | A.Int | A.Bool -> L.build_store (L.const_int (ltype_of_typ t) 0) des builder
       | A.Float -> L.build_store (L.const_float (ltype_of_typ t) 0.0) des builder
@@ -845,6 +857,7 @@ let translate program =
       if n = 0 then l
       else gen_type_list (t :: l) t (n-1)
 
+      (* local declarations generation *)
     and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
       let (_, tmp) = e in

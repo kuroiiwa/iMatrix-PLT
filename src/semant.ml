@@ -20,6 +20,7 @@ let check program =
     | _ as t -> t
   in
 
+(*   check any assign type equality, allow mat-Float array and img-Int array assignment *)
   let check_assign lvaluet rvaluet err = match lvaluet,rvaluet with
     | Mat,Array(Array(Float,a),b) when a > 0 && b > 0 -> Mat
     | Mat,Mat -> Mat
@@ -37,11 +38,12 @@ let check program =
     with Not_found -> raise (Failure ("undeclared identifier " ^ s))
   in
 
+  (* return struct member list  *)
   let check_struct_scope var_symbols n =
     let ty = type_of_identifier var_symbols n in
     (match ty with
      | Struct(_) -> ()
-     | _ -> raise(Failure("struct not defined"))
+     | _ -> raise(Failure("struct not defined " ^ n))
     )
   in
 
@@ -51,6 +53,7 @@ let check program =
     with Not_found -> raise (Failure ("unrecognized function " ^ s))
   in
 
+(*   check if array have same element type *)
   let check_list_type sarr = match sarr with
     | [] -> raise(Failure ("internal error: array should not be empty"))
     | (hd :: _) ->
@@ -62,11 +65,13 @@ let check program =
       (Array(ty, List.length sarr), SArrVal(sarr))
   in
 
+(*   return array depth 1 or 2 or 3 *)
   let rec array_dim n = function
     | Array(t, _) -> array_dim (n+1) t
     | _ -> n
   in
 
+(*   helper function to expand slicing list *)
   let expand_slice slice n = (* n <= 3 *)
     match (n, List.length slice) with
     | (3,1) -> slice @ [(Literal(-1),Literal(-1))] @ [(Literal(-1),Literal(-1))]
@@ -74,6 +79,7 @@ let check program =
     | _ -> slice
   in
 
+  (* return to the original AST type based on checked slicing list *)
   let slice_helper2 (var: ((int * (sexpr * sexpr)) list)) typ name = 
     (* given input arr/mat/img and input slice, output the range (how many number we will get 
        after slicing and new slice (deal with -1)) *)
@@ -120,17 +126,20 @@ let check program =
     | _ -> List.rev l 
   in
 
+  (* dereference array depth if possible *)
   let rec downgrade_dim = function
     | Array(t,d) when d=1 -> downgrade_dim t
     | _ as t -> t
   in
 
+  (* mat and img only support single element slicing *)
   let check_equal (((_,a),(_,b)) as tuple) = match a,b with
     | SId(_),SId(_) -> tuple
     | SLiteral(a), SLiteral(b) when a = b -> tuple
     | _ -> raise(Failure("illegal slicing for mat/img")) 
   in
 
+  (* check slicing semantic *)
   let rec check_slice (vars, funcs) n l =
     let ty = type_of_identifier vars n in
     let check_slice_expr (a,b) = 
@@ -158,6 +167,7 @@ let check program =
       (ty', e)
     | _,_ -> raise(Failure("illegal slicing"))
 
+  (* check expr in array of depth 3 *)
   and check_arr3 (v,f) arr3 =
     let sarr3 = List.map (check_arr2 (v,f)) arr3 in
     check_list_type sarr3
@@ -479,7 +489,7 @@ let check program =
       | Stmt(st) -> let temp = check_stmt (var_symbols, func_symbols) st in (var_symbols, func_symbols, SStmt(temp) :: body_sast)
     in
 
-    (****      There could be multiple returns in different blocks ****)
+    (**** There could be multiple returns in different blocks ****)
     (**** Check all return in all statements ****)
     (**** Return could only be absent in void function ****)
     (**** nothing should follow return ****)
