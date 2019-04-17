@@ -171,6 +171,11 @@ let translate program =
   let __printMat_func : L.llvalue =
     L.declare_function "printMat" __printMat_t the_module in
 
+  let __printImg_t : L.lltype =
+    L.function_type i32_t [| img_t |] in
+  let __printImg_func : L.llvalue =
+    L.declare_function "printImg" __printImg_t the_module in
+
   let __setIntArray_t : L.lltype =
     L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
   let __setIntArray_func : L.llvalue =
@@ -618,7 +623,7 @@ let translate program =
       and (t, _) = e in
       match t with
       | A.Mat -> L.build_call __printMat_func [| e' |] "" builder
-      | A.Img -> raise NotImplemented
+      | A.Img -> L.build_call __printImg_func [| e' |] "" builder
       | A.Array(_) when get_type_arr t = A.Int ->
         let (t,_) = e in
         let ar = extDim t in

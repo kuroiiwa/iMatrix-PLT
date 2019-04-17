@@ -31,6 +31,18 @@ void printMat(struct mat* a) {
 	}
 }
 
+void printImg(struct img* a) {
+	printf("%d %d \n", a->row, a->col);
+	for (int i = 0; i < a->row; i++) {
+		for (int j = 0; j < a->col; j++) {
+			for (int k = 0; k < 3; k++)
+			printf("%d ", a->data[i][j][k]);
+		printf("\n");
+		}
+	printf("\n");
+	}
+}
+
 float __returnMatVal(struct mat* a, int r, int c) {
 	return a->data[r][c];
 }

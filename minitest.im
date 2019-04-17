@@ -15,5 +15,13 @@ int main() {
 	notme = test_f(me);
 	print(me.a);
 	print(notme.a);
+
+	mat m1(2,4);
+	img i1(10,8);
+
+	print(m1);
+	print(i1);	
+
 	return 0;
+	
 }
