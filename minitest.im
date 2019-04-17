@@ -17,10 +17,21 @@ int main() {
 	print(notme.a);
 
 	mat m1(2,4);
+//	m1 = [[1.,2.,3.,4.],[5.,6.,7.,8.]];
+	mat m2(4,3);
+	mat m3(2,3);
+	m3 = matMul(m1, m2);
 	img i1(10,8);
 
-	print(m1);
-	print(i1);	
+	print(m3);
+	//print(i1);	
+
+	img i2(10,8);
+	aveFilter(i1, 2);
+	i2 = aveFilter(i1, 2);
+
+	img i3(10,8);
+	i3 = edgeDetection(i1, 3);
 
 	return 0;
 	

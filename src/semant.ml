@@ -270,7 +270,12 @@ let check program =
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
       in (ty, SBinop((t1, e1'), op, (t2, e2')))
     | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
-    | Call("matMul", [e1;e2;e3]) -> raise NotImplemented
+    | Call("matMul", [e1;e2]) -> (Mat, SCall("matMul", [check_expr (var_symbols, func_symbols) e1;
+                                                        check_expr (var_symbols, func_symbols) e2]))
+    | Call("aveFilter", [e1;e2]) -> (Img, SCall("aveFilter", [check_expr (var_symbols, func_symbols) e1;
+                                                        check_expr (var_symbols, func_symbols) e2]))
+    | Call("edgeDetection", [e1;e2]) -> (Img, SCall("edgeDetection", [check_expr (var_symbols, func_symbols) e1;
+                                                        check_expr (var_symbols, func_symbols) e2]))
     (*       let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
              let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
              let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in

@@ -207,22 +207,19 @@ let translate program =
     L.declare_function "__setImgVal" __setImgVal_t the_module in
 
   let matMul_t : L.lltype = 
-    L.function_type i32_t [| array2_float_t ; array2_float_t ; array2_float_t;
-                             i32_t ; i32_t ; i32_t|] in
-  let matMul_func: L.llvalue = 
+    L.function_type mat_t [| mat_t; mat_t|] in
+  let matMul_func : L.llvalue = 
     L.declare_function "matMul" matMul_t the_module in
 
   let aveFilter_t : L.lltype = 
-    L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
-                             i32_t ; i32_t ; i32_t|] in
-  let aveFilter_func: L.llvalue = 
+    L.function_type img_t [| img_t; i32_t|] in
+  let aveFilter_func : L.llvalue = 
     L.declare_function "aveFilter" aveFilter_t the_module in
 
   let edgeDetection_t : L.lltype = 
-    L.function_type i32_t [| array3_i8_t ; array3_i8_t ; i32_t;
-                             i32_t ; i32_t ; i32_t|] in
-  let edgeDetection_func: L.llvalue = 
-    L.declare_function "edgeDetection" edgeDetection_t the_module in
+    L.function_type img_t [| img_t ; i32_t|] in
+  let edgeDetection_func : L.llvalue = 
+    L.declare_function "edgeDetection" edgeDetection_t the_module in 
 
   (* buult-in functions for users *)
   let builtin_funcs =
@@ -735,30 +732,20 @@ let translate program =
          | A.Not                  -> L.build_not) e' "tmp" builder
       | SCall ("print", [e]) ->
         call_print (local_vars, builder) e
-      | SCall ("matMul", [e1;e2;e3]) ->
+      | SCall ("matMul", [e1;e2]) ->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in
-        let e3' = expr (local_vars, builder) e3 in
-        let (t1,_) = e1 in let (t2,_) = e2 in 
-        let ar1 = extDim t1 in let ar2 = extDim t2 in
-        let des1 = L.build_bitcast e1' array2_float_t "tmp" builder in
-        let des2 = L.build_bitcast e2' array2_float_t "tmp" builder in
-        let des3 = L.build_bitcast e3' array2_float_t "tmp" builder in
-        L.build_call matMul_func [| des1; des2; des3; 
-                                    L.const_int i32_t ar1.(0); L.const_int i32_t ar1.(1); L.const_int i32_t ar2.(1) |] "matMul" builder
-      | (SCall ("aveFilter", [e1;e2;e3]) | SCall("edgeDetection", [e1;e2;e3])) as f->
+        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
+        let des2 = L.build_bitcast e2' mat_t "tmp" builder in
+        L.build_call matMul_func [| des1; des2 |] "matMul" builder
+      | (SCall ("aveFilter", [e1;e2]) | SCall("edgeDetection", [e1;e2])) as f->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in
-        let e3' = expr (local_vars, builder) e3 in
-        let (t1,_) = e1 in let v3 = e3' in 
-        let des1 = L.build_bitcast e1' array3_i8_t "tmp" builder in
-        let des2 = L.build_bitcast e2' array3_i8_t "tmp" builder in
-        let ar1 = extDim t1 in 
+        let des1 = L.build_bitcast e1' img_t "tmp" builder in
+        let des2 = L.build_bitcast e2' i32_t "tmp" builder in
         (match f with
-         | SCall ("aveFilter",_) -> L.build_call aveFilter_func [| des1; des2; L.const_int i32_t ar1.(0);
-                                                                   L.const_int i32_t ar1.(1); L.const_int i32_t ar1.(2) ; v3 |] "aveFilter" builder
-         | SCall ("edgeDetection",_) -> L.build_call edgeDetection_func [| des1; des2; L.const_int i32_t ar1.(0);
-                                                                           L.const_int i32_t ar1.(1); L.const_int i32_t ar1.(2) ; v3 |] "edgeDetection" builder
+         | SCall ("aveFilter",_) -> L.build_call aveFilter_func [| des1; des2 |] "aveFilter" builder
+         | SCall ("edgeDetection",_) -> L.build_call edgeDetection_func [| des1; des2 |] "edgeDetection" builder
          | _ -> raise(InternalError("internel error: unsupported function detected")))
       | SCall (f, args) ->
         let (fdef, fdecl) = StringMap.find f function_decls in
