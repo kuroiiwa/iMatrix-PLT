@@ -698,12 +698,17 @@ let translate program =
         let (t,_) = e in
         let des = L.build_load (lookup local_vars s) s builder in
         if L.type_of des = mat_t then
-          (let ar = extDim t in
-          L.build_call __setMat_func [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder)
-        else (if L.type_of des = img_t then
+          (match t with
+            | A.Mat -> L.build_store e' (lookup local_vars s) builder
+            | A.Array(_) ->
+          let ar = extDim t in
+          L.build_call __setMat_func [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+            | _ -> raise(InternalError("Assign type failure"))
+          )
+        else if L.type_of des = img_t then
           raise NotImplemented
         else
-        ignore(L.build_store e' (lookup local_vars s) builder); e')
+          L.build_store e' (lookup local_vars s) builder
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
         set_slice_opt (local_vars, builder) (des, lst, e) ty 
@@ -897,4 +902,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
+  ignore(L.dump_module the_module);
   the_module
