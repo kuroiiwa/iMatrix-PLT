@@ -186,6 +186,11 @@ let translate program =
   let __setFloArray_func : L.llvalue =
     L.declare_function "__setFloArray" __setFloArray_t the_module in
 
+  let __setMat_t : L.lltype =
+    L.function_type i32_t [|mat_t; array2_float_t; i32_t; i32_t|] in
+  let __setMat_func : L.llvalue =
+    L.declare_function "__setMat" __setMat_t the_module in
+
   let __returnMatVal_t : L.lltype =
     L.function_type float_t [| mat_t; i32_t ; i32_t |] in
   let __returnMatVal_func : L.llvalue =
@@ -674,16 +679,31 @@ let translate program =
             | (_,SGetMember(a,b)) -> (a,b)
             | _ -> raise (InternalError("internal error: struct assign"))) in
         let (des, _) = getmember (true, local_vars, builder) (se1', se2') in
-
-        (match ty,se2' with
-         | A.Array(_),(_, SSlice(_, slice_l)) -> 
+        let (t,_) = se2 in
+        (match ty,t,se2' with
+         | A.Array(_),_,(_, SSlice(_, slice_l)) -> 
            let dst = L.build_load des "tmp" builder in
            set_slice (local_vars, builder) (dst, slice_l, se2) ty
+         | A.Mat,A.Array(_),_ ->
+          let e' = expr (local_vars, builder) se2 in
+          let dst = L.build_load des "tmp" builder in
+          let ar = extDim t in
+          L.build_call __setMat_func [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+         | A.Img,_,_ -> raise NotImplemented
          | _ -> let e' = expr (local_vars, builder) se2 in
            ignore(L.build_store e' des builder); e')
 
-      | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
-        ignore(L.build_store e' (lookup local_vars s) builder); e'
+      | SAssign (s, e) -> 
+        let e' = expr (local_vars, builder) e in
+        let (t,_) = e in
+        let des = L.build_load (lookup local_vars s) s builder in
+        if L.type_of des = mat_t then
+          (let ar = extDim t in
+          L.build_call __setMat_func [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder)
+        else (if L.type_of des = img_t then
+          raise NotImplemented
+        else
+        ignore(L.build_store e' (lookup local_vars s) builder); e')
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
         set_slice_opt (local_vars, builder) (des, lst, e) ty 
@@ -843,6 +863,8 @@ let translate program =
         let lst_ty = List.rev tmp in
         ignore(List.map (store_helper builder des) lst_ty);
         des
+      | A.Mat -> L.build_store (L.const_pointer_null mat_t) des builder
+      | A.Img -> raise NotImplemented
       | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
     and gen_type_list l t n =

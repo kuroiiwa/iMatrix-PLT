@@ -20,7 +20,7 @@ let bind_arr_dcl_expr t id dim e = match t,dim with
   | _ -> raise(Failure("dimension error"))
 
 let bind_dcl ty id e = match ty with
-  | Mat | Img -> raise(Failure("matrix and image should have initialization"))
+  | Img -> raise(Failure("matrix and image should have initialization"))
   | _ -> (ty, id, e)
 
 let bind_arr_mat_img typ id (e1, e2) dim = 
