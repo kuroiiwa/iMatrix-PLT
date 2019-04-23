@@ -24,6 +24,7 @@ struct mat {
 
 
 void printMat(struct mat* a) {
+	assert(a != NULL);
 	printf("row: %d col: %d \n\n", a->row, a->col);
 	for (int i = 0; i < a->row; i++) {
 		for (int j = 0; j < a->col; j++)
@@ -45,19 +46,31 @@ void printImg(struct img* a) {
 }
 
 float __returnMatVal(struct mat* a, int r, int c) {
+	assert(a != NULL);
 	return a->data[r][c];
 }
 
 int __returnImgVal(struct img* a, int ch, int r, int c) {
+	assert(a != NULL);
 	return a->data[ch][r][c];
 }
 
 void __setMatVal(double val, struct mat* a, int r, int c) {
+	assert(a != NULL);
 	a->data[r][c] = val;
 }
 
 void __setImgVal(int val, struct img* a, int ch, int r, int c) {
+	assert(a != NULL);
 	a->data[ch][r][c] = val;
+}
+
+void __setMat(struct mat* a, double** arr, int row, int col) {
+	assert(a != NULL);
+	assert(a->row == row && a->col == col);
+	for (int r = 0; r < row; r++)
+		for (int c = 0; c < col; c++)
+			a->data[r][c] = arr[r][c];
 }
 
 
@@ -106,6 +119,7 @@ void free_img(struct img* i) {
 }
 
 void free_mat(struct mat* m) {
+	assert(m != NULL);
 	const int row = m -> row;
 	const int col = m -> col;
 

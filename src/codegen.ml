@@ -186,6 +186,11 @@ let translate program =
   let __setFloArray_func : L.llvalue =
     L.declare_function "__setFloArray" __setFloArray_t the_module in
 
+  let __setMat_t : L.lltype =
+    L.function_type i32_t [|mat_t; array2_float_t; i32_t; i32_t|] in
+  let __setMat_func : L.llvalue =
+    L.declare_function "__setMat" __setMat_t the_module in
+
   let __returnMatVal_t : L.lltype =
     L.function_type float_t [| mat_t; i32_t ; i32_t |] in
   let __returnMatVal_func : L.llvalue =
@@ -284,7 +289,7 @@ let translate program =
     | SArrVal arr ->
       let (ty_ele, _) = List.hd arr in
       let arrval = List.map (expr_val g_vars) arr in
-      L.define_global "tmp" (L.const_array (ltype_of_typ ty_ele) (Array.of_list arrval)) the_module
+      L.define_global "_t" (L.const_array (ltype_of_typ ty_ele) (Array.of_list arrval)) the_module
     | SSlice(_) -> raise (InternalError("semant should have rejected slicing in init"))
     | SNoexpr     -> L.const_int i32_t 0
     | SId s       -> L.global_initializer (lookup_global g_vars s)
@@ -370,9 +375,9 @@ let translate program =
   (* Create a map of global variables after creating each *)
   let global_vars : L.llvalue StringMap.t =
     let global_var m (t, n, e) =
-      let (_, tmp) = e in
+      let (_, _t) = e in
       let e' = expr_val m e in
-      let init = match tmp,t with
+      let init = match _t,t with
         | SNoexpr,_ -> type_zeroinitializer t
         | _,A.String -> L.const_bitcast e' (ltype_of_typ t)
         | SArrVal(_),_ -> L.const_bitcast e' (ltype_of_typ t)
@@ -445,16 +450,16 @@ let translate program =
     let rec copy_eles res des n (vars, builder) =
       if n = 0 then ()
       else (
-        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
-        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
-        let ele = L.build_load res "tmp" builder in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copy_t" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copy_t" builder else des in
+        let ele = L.build_load res "_t" builder in
         ignore(L.build_store ele des builder);
         copy_eles new_res new_des (n-1) (vars, builder)) 
     in
 
     (* dereference pointer function *)
     let deref builder (des,prev) (a,b) =
-      if a = b && prev then (L.build_load des "tmp" builder, true)
+      if a = b && prev then (L.build_load des "_t" builder, true)
       else (des, false)
     in
 
@@ -462,10 +467,10 @@ let translate program =
     let rec copy_slice_helper2 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
-        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
-        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
-        let tmp_orig = L.build_load res "tmp" builder in
-        let slice = copy_slice tmp_orig ([List.nth index_l 1]) (vars, builder) false in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copy_t" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copy_t" builder else des in
+        let _t_orig = L.build_load res "_t" builder in
+        let slice = copy_slice _t_orig ([List.nth index_l 1]) (vars, builder) false in
         ignore(L.build_store slice des builder);
         copy_slice_helper2 new_res new_des (n-1) index_l (vars, builder)
       )
@@ -474,10 +479,10 @@ let translate program =
     and copy_slice_helper3 res des n index_l (vars, builder) =
       if n = 0 then ()
       else (
-        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copytmp" builder else res
-        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copytmp" builder else des in
-        let tmp_orig = L.build_load res "tmp" builder in
-        let slice = copy_slice tmp_orig (List.tl index_l) (vars, builder) false in
+        let new_res = if n <> 1 then L.build_in_bounds_gep res [|L.const_int i32_t 1|] "copy_t" builder else res
+        and new_des = if n <> 1 then L.build_in_bounds_gep des [|L.const_int i32_t 1|] "copy_t" builder else des in
+        let _t_orig = L.build_load res "_t" builder in
+        let slice = copy_slice _t_orig (List.tl index_l) (vars, builder) false in
         ignore(L.build_store slice des builder);
         copy_slice_helper3 new_res new_des (n-1) index_l (vars, builder)
       )
@@ -508,11 +513,11 @@ let translate program =
         | (_,SId(_)),(_,SId(_)) -> 1
         | (_,SLiteral(a')),(_,SLiteral(b')) -> b' - a' + 1 
         | _ -> raise(InternalError("slicing has wrong type")) in
-      let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "tmp" builder in
+      let res = L.build_in_bounds_gep orig [|expr (vars, builder) a|] "_t" builder in
 
-      let tmp = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "tmp" builder in  
-      let des_tmp = L.build_in_bounds_gep tmp [|L.const_int i32_t 0|] "tmp" builder in
-      let des = L.build_bitcast des_tmp (L.type_of res) "tmp" builder in
+      let _t = L.build_alloca (L.array_type (L.element_type (L.type_of orig)) len) "_t" builder in  
+      let des__t = L.build_in_bounds_gep _t [|L.const_int i32_t 0|] "_t" builder in
+      let des = L.build_bitcast des__t (L.type_of res) "_t" builder in
       ignore(match (List.length index_l) with
           | 1 -> copy_eles res des len (vars, builder)
           | 2 -> copy_slice_helper2 res des len index_l (vars, builder)
@@ -530,8 +535,8 @@ let translate program =
           | SSlice(s, l) ->
             let (a,_) = List.hd l in
             let pos = expr (local_vars, builder) a in
-            let src = L.build_load (lookup local_vars s) "tmp" builder in
-            (L.build_in_bounds_gep src [| pos |] "tmp" builder,s)
+            let src = L.build_load (lookup local_vars s) "_t" builder in
+            (L.build_in_bounds_gep src [| pos |] "_t" builder,s)
           | SGetMember(e1, e2) -> getmember (true, local_vars, builder) (e1, e2)
           | _ -> raise(InternalError("accessing non struct member")))
       in
@@ -554,10 +559,10 @@ let translate program =
         | (_,SSlice(s,_)) -> list_pos s bind_l
         | _ -> raise(InternalError("accessing wrong struct member"))
       in
-      let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "tmp" builder in
+      let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "_t" builder in
       let deref_ptr ptr (a,_) =
         let offset = expr (local_vars, builder) a in
-        let des = L.build_load ptr "tmp" builder in
+        let des = L.build_load ptr "_t" builder in
         L.build_in_bounds_gep des [| offset |] "derefptr" builder
       in
       let isPtr = ref ptr in
@@ -565,15 +570,22 @@ let translate program =
         | (_,SId(s)) -> p
         | (slice_type ,SSlice(s,l)) -> (match slice_type with
             | A.Array(_) -> if !isPtr = true then p else
-                let orig = L.build_load p "tmp" builder in
+                let orig = L.build_load p "_t" builder in
                 ignore(isPtr := true);
                 copy_slice_opt orig l (local_vars, builder) true
+            | _ when L.type_of (L.build_load p "_t" builder) = mat_t ->
+              if !isPtr = true then p else
+              let orig = L.build_load p "_t" builder in
+              ignore(isPtr := true);
+              copy_slice_opt orig l (local_vars, builder) true
+            | _ when L.type_of (L.build_load p "_t" builder) = img_t ->
+              raise NotImplemented
             | _ -> List.fold_left deref_ptr p l)
         | _ -> raise(InternalError("getmember error"))
       in
 
       if !isPtr = true then (final, n)
-      else (L.build_load final "tmp" builder, n)
+      else (L.build_load final "_t" builder, n)
 
       (* set slicing value compatible with mat/img *)
     and set_slice_opt (local_vars, builder) (dst, index_l, re) ty = 
@@ -598,9 +610,9 @@ let translate program =
 
     and set_slice (local_vars, builder) (dst, lst, re) ty = 
       let create_ptr c builder =
-        let tmp = L.build_alloca (L.type_of c) "tmpptr" builder in
-        ignore(L.build_store c tmp builder);
-        tmp
+        let _t = L.build_alloca (L.type_of c) "_tptr" builder in
+        ignore(L.build_store c _t builder);
+        _t
       in
 
       let extDim1 = function
@@ -619,8 +631,8 @@ let translate program =
       let depth = List.length lst in
 
       let flatten_l = List.rev (List.fold_left (fun l (a,b) -> b :: a :: l) [] lst) in
-      let tmp = expr (local_vars, builder) (A.Array(A.Int, List.length flatten_l), SArrVal(flatten_l)) in
-      let slice_info = L.build_bitcast tmp array1_i32_t "tmp" builder in
+      let _t = expr (local_vars, builder) (A.Array(A.Int, List.length flatten_l), SArrVal(flatten_l)) in
+      let slice_info = L.build_bitcast _t array1_i32_t "_t" builder in
       let (ty, _) = arr_type_helper ty in
       (match ty with
        | A.Int ->
@@ -644,19 +656,19 @@ let translate program =
       | A.Array(_) when get_type_arr t = A.Int ->
         let (t,_) = e in
         let ar = extDim t in
-        let des = L.build_bitcast e' array3_i32_t "tmp" builder in
+        let des = L.build_bitcast e' array3_i32_t "_t" builder in
         L.build_call __printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
           "" builder
       | A.Array(_) when get_type_arr t = A.Float ->
         let (t,_) = e in
         let ar = extDim t in
-        let des = L.build_bitcast e' array3_float_t "tmp" builder in
+        let des = L.build_bitcast e' array3_float_t "_t" builder in
         L.build_call __printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
           "" builder
       | A.Array(_) when get_type_arr t = A.Char ->
         let (t,_) = e in
         let ar = extDim t in
-        let des = L.build_bitcast e' array3_i8_t "tmp" builder in
+        let des = L.build_bitcast e' array3_i8_t "_t" builder in
         L.build_call __printCharArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
           "" builder
       | _ -> L.build_call __printf_func [| ty_to_format e ; e' |] "" builder
@@ -673,12 +685,12 @@ let translate program =
         (* build the array element by element, might be optimized *)
         let arr_helper builder ptr lvalue =
           ignore(L.build_store lvalue ptr builder);
-          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "tmp" builder
+          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "_t" builder
         in
         let (ty_ele, _) = List.hd arr in
         let arrval = List.map (expr (local_vars,builder)) arr in
-        let ptr_tmp = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "tmp" builder in
-        let ptr = L.build_bitcast ptr_tmp (ltype_of_typ ty) "tmp" builder in
+        let ptr__t = L.build_alloca (L.array_type (ltype_of_typ ty_ele) (List.length arrval)) "_t" builder in
+        let ptr = L.build_bitcast ptr__t (ltype_of_typ ty) "_t" builder in
         ignore(List.fold_left (arr_helper builder) ptr arrval);
         ptr
       | SSlice(d, index_l) ->
@@ -694,16 +706,35 @@ let translate program =
             | (_,SGetMember(a,b)) -> (a,b)
             | _ -> raise (InternalError("internal error: struct assign"))) in
         let (des, _) = getmember (true, local_vars, builder) (se1', se2') in
-
-        (match ty,se2' with
-         | A.Array(_),(_, SSlice(_, slice_l)) -> 
-           let dst = L.build_load des "tmp" builder in
-           set_slice (local_vars, builder) (dst, slice_l, se2) ty
+        let (t,_) = se2 in
+        let dst = L.build_load des "_t" builder in
+        (match ty,t,se2' with
+         | _,_,(_, SSlice(_, slice_l)) -> 
+           set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
+         | A.Mat,A.Array(_),_ ->
+          let e' = expr (local_vars, builder) se2 in
+          let ar = extDim t in
+          L.build_call __setMat_func [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+         | A.Img,A.Array(_),_ -> raise NotImplemented
          | _ -> let e' = expr (local_vars, builder) se2 in
            ignore(L.build_store e' des builder); e')
 
-      | SAssign (s, e) -> let e' = expr (local_vars, builder) e in
-        ignore(L.build_store e' (lookup local_vars s) builder); e'
+      | SAssign (s, e) -> 
+        let e' = expr (local_vars, builder) e in
+        let (t,_) = e in
+        let des = L.build_load (lookup local_vars s) s builder in
+        if L.type_of des = mat_t then
+          (match t with
+            | A.Mat -> L.build_store e' (lookup local_vars s) builder
+            | A.Array(_) ->
+          let ar = extDim t in
+          L.build_call __setMat_func [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+            | _ -> raise(InternalError("Assign type failure"))
+          )
+        else if L.type_of des = img_t then
+          raise NotImplemented
+        else
+          L.build_store e' (lookup local_vars s) builder
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
         set_slice_opt (local_vars, builder) (des, lst, e) ty 
@@ -755,6 +786,7 @@ let translate program =
         let des2 = L.build_bitcast e2' img_t "tmp" builder in
         let des3 = L.build_bitcast e3' i8_t "tmp" builder in
         L.build_call imgOperator_func [| des1; des2; des3|] "imgOperator" builder
+        ) e1' e2' "_t" builder
       | SBinop (e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2 in
@@ -773,20 +805,20 @@ let translate program =
          | A.Greater -> L.build_icmp L.Icmp.Sgt
          | A.Geq     -> L.build_icmp L.Icmp.Sge
          | A.Pow     ->  raise (InternalError "internal error: Power for int not supported yet")
-        ) e1' e2' "tmp" builder
+        ) e1' e2' "_t" builder
       | SUnop(op, ((t, _) as e)) ->
         let e' = expr (local_vars, builder) e in
         (match op with
            A.Neg when t = A.Float -> L.build_fneg 
          | A.Neg                  -> L.build_neg
-         | A.Not                  -> L.build_not) e' "tmp" builder
+         | A.Not                  -> L.build_not) e' "_t" builder
       | SCall ("print", [e]) ->
         call_print (local_vars, builder) e
       | SCall ("matMul", [e1;e2]) ->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
-        let des2 = L.build_bitcast e2' mat_t "tmp" builder in
+        let des1 = L.build_bitcast e1' mat_t "_t" builder in
+        let des2 = L.build_bitcast e2' mat_t "_t" builder in
         L.build_call matMul_func [| des1; des2 |] "matMul" builder
       | SCall ("matAssign", [e1;e2]) ->
         let e1' = expr (local_vars, builder) e1 in
@@ -803,8 +835,8 @@ let translate program =
       | (SCall ("aveFilter", [e1;e2]) | SCall("edgeDetection", [e1;e2])) as f->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' img_t "tmp" builder in
-        let des2 = L.build_bitcast e2' i32_t "tmp" builder in
+        let des1 = L.build_bitcast e1' img_t "_t" builder in
+        let des2 = L.build_bitcast e2' i32_t "_t" builder in
         (match f with
          | SCall ("aveFilter",_) -> L.build_call aveFilter_func [| des1; des2 |] "aveFilter" builder
          | SCall ("edgeDetection",_) -> L.build_call edgeDetection_func [| des1; des2 |] "edgeDetection" builder
@@ -886,25 +918,27 @@ let translate program =
       | A.Array(arr_ty, num) ->
         let store_helper builder ptr t =
           ignore(local_type_zeroinitializer ptr builder t);
-          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "tmp" builder
+          L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "_t" builder
         in
 
         let ty_l = gen_type_list [] arr_ty num in
         let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder in
-        let ptr = L.build_bitcast spc (ltype_of_typ t) "tmp" builder in
+        let ptr = L.build_bitcast spc (ltype_of_typ t) "_t" builder in
 
         ignore(List.fold_left (store_helper builder) ptr ty_l);
         L.build_store ptr des builder
 
       | A.Struct(_, l) -> 
         let store_helper builder des (t,n) =
-          let ptr = L.build_in_bounds_gep des [| L.const_int i32_t 0 ; L.const_int i32_t n|] "tmp" builder in
+          let ptr = L.build_in_bounds_gep des [| L.const_int i32_t 0 ; L.const_int i32_t n|] "_t" builder in
           local_type_zeroinitializer ptr builder t
         in
-        let (_, tmp) = List.fold_left (fun (n,l) (ty, _) -> (n+1, (ty,n) :: l)) (0,[]) l in
-        let lst_ty = List.rev tmp in
+        let (_, _t) = List.fold_left (fun (n,l) (ty, _) -> (n+1, (ty,n) :: l)) (0,[]) l in
+        let lst_ty = List.rev _t in
         ignore(List.map (store_helper builder des) lst_ty);
         des
+      | A.Mat -> L.build_store (L.const_pointer_null mat_t) des builder
+      | A.Img -> raise NotImplemented
       | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
     and gen_type_list l t n =
@@ -914,8 +948,8 @@ let translate program =
       (* local declarations generation *)
     and add_local (local_vars , builder) (t, n, e) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder in
-      let (_, tmp) = e in
-      let () = match tmp,t with
+      let (_, _t) = e in
+      let () = match _t,t with
         | SNoexpr,_ -> ignore(local_type_zeroinitializer local_var builder t);()
         | SStrLit str,_ -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
         | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
