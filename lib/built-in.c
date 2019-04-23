@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 
 struct img {
 	int row;
@@ -23,7 +24,7 @@ struct mat {
 
 
 void printMat(struct mat* a) {
-	printf("%d %d \n", a->row, a->col);
+	printf("row: %d col: %d \n\n", a->row, a->col);
 	for (int i = 0; i < a->row; i++) {
 		for (int j = 0; j < a->col; j++)
 			printf("%lf ", a->data[i][j]);
@@ -32,10 +33,10 @@ void printMat(struct mat* a) {
 }
 
 void printImg(struct img* a) {
-	printf("%d %d \n", a->row, a->col);
-	for (int i = 0; i < a->row; i++) {
-		for (int j = 0; j < a->col; j++) {
-			for (int k = 0; k < 3; k++)
+	printf("row: %d col: %d \n\n", a->row, a->col);
+	for (int k = 0; k < 3; k++) {
+		for (int i = 0; i < a->row; i++) {
+			for (int j = 0; j < a->col; j++)
 			printf("%d ", a->data[i][j][k]);
 		printf("\n");
 		}
@@ -408,6 +409,58 @@ struct mat* matMul(struct mat* m1, struct mat* m2) {
 				m3 -> data[i][j] += m1 -> data[i][k] * m2 -> data[k][j];
 		}
 	}
+	return m3;
+}
+
+struct mat* matAssign(struct mat* m, double val) {
+	for (int i = 0; i < m->row; ++i)
+		for (int j = 0; j < m->col; ++j)
+			m->data[i][j] = val;
+	return m;
+}
+
+struct mat* matOperator(struct mat* m1, struct mat* m2, char op) {
+	assert(m1->row==m2->row);
+	assert(m1->col==m2->col);
+	int r = m1->row, c = m1->col;
+	struct mat* m3 = malloc_mat(r, c);
+	for (int i = 0; i < r; ++i)
+		for (int j = 0; j < c; ++j)
+			switch (op)
+			{
+				case '+': m3->data[i][j] = m1->data[i][j] + m2->data[i][j]; break;
+				case '-': m3->data[i][j] = m1->data[i][j] - m2->data[i][j]; break;
+				case '*': m3->data[i][j] = m1->data[i][j] * m2->data[i][j]; break;
+				case '/': m3->data[i][j] = m1->data[i][j] / m2->data[i][j]; break;
+			}
+	return m3;
+}
+
+struct img* imgAssign(struct img* m, int val) {
+	val = (0<=val)?val:0;
+	val = (val<=255)?val:255;
+	for (int i = 0; i < m->row; ++i)
+		for (int j = 0; j < m->col; ++j)
+			for (int k = 0; k < 3; ++k)
+				m->data[i][j][k] = val;
+	return m;
+}
+
+struct img* imgOperator(struct img* m1, struct img* m2, char op) {
+	assert(m1->row==m2->row);
+	assert(m1->col==m2->col);
+	int r = m1->row, c = m1->col;
+	struct img* m3 = malloc_img(r, c);
+	for (int i = 0; i < r; ++i)
+		for (int j = 0; j < c; ++j)
+			for (int k = 0; k < 3; ++k)
+				switch (op)
+				{
+					case '+': m3->data[i][j][k] = m1->data[i][j][k] + m2->data[i][j][k]; break;
+					case '-': m3->data[i][j][k] = m1->data[i][j][k] - m2->data[i][j][k]; break;
+					case '*': m3->data[i][j][k] = m1->data[i][j][k] * m2->data[i][j][k]; break;
+					case '/': m3->data[i][j][k] = m1->data[i][j][k] / m2->data[i][j][k]; break;
+				}
 	return m3;
 }
 

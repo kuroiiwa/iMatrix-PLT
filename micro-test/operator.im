@@ -1,0 +1,17 @@
+int main()
+{
+	/*
+	mat a(2,2);
+	mat b(2,2);
+	matAssign(a, 2.0);
+	matAssign(b, 5.0);
+	a = a+b;
+	print(a);
+	*/
+	img a(2,4);
+	img b(2,4);
+	imgAssign(a, 2);
+	imgAssign(b, 6);
+	print(b-a);
+	return 0;
+}

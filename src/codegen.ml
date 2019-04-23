@@ -211,6 +211,26 @@ let translate program =
   let matMul_func : L.llvalue = 
     L.declare_function "matMul" matMul_t the_module in
 
+  let matOperator_t : L.lltype = 
+    L.function_type mat_t [| mat_t; mat_t; i8_t|] in
+  let matOperator_func : L.llvalue = 
+    L.declare_function "matOperator" matOperator_t the_module in
+
+  let matAssign_t : L.lltype = 
+    L.function_type mat_t [| mat_t; float_t|] in
+  let matAssign_func : L.llvalue = 
+    L.declare_function "matAssign" matAssign_t the_module in
+
+  let imgOperator_t : L.lltype = 
+    L.function_type img_t [| img_t; img_t; i8_t|] in
+  let imgOperator_func : L.llvalue = 
+    L.declare_function "imgOperator" imgOperator_t the_module in
+
+  let imgAssign_t : L.lltype = 
+    L.function_type img_t [| img_t; i32_t|] in
+  let imgAssign_func : L.llvalue = 
+    L.declare_function "imgAssign" imgAssign_t the_module in
+
   let aveFilter_t : L.lltype = 
     L.function_type img_t [| img_t; i32_t|] in
   let aveFilter_func : L.llvalue = 
@@ -705,6 +725,36 @@ let translate program =
          | A.And | A.Or | A.Mod | A.Pow->
            raise (InternalError "internal error: semant should have rejected and/or on float")
         ) e1' e2' "tmp" builder
+      | SBinop ((A.Mat,_ ) as e1, op, e2) ->
+        let e1' = expr (local_vars, builder) e1
+        and e2' = expr (local_vars, builder) e2
+        and e3' = L.const_int i8_t (Char.code 
+        (match op with
+           A.Add     -> '+'
+         | A.Sub     -> '-'
+         | A.Mult    -> '*'
+         | A.Div     -> '/'
+         | _         -> '_'
+        )) in
+        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
+        let des2 = L.build_bitcast e2' mat_t "tmp" builder in
+        let des3 = L.build_bitcast e3' i8_t "tmp" builder in
+        L.build_call matOperator_func [| des1; des2; des3|] "matOperator" builder
+      | SBinop ((A.Img,_ ) as e1, op, e2) ->
+        let e1' = expr (local_vars, builder) e1
+        and e2' = expr (local_vars, builder) e2
+        and e3' = L.const_int i8_t (Char.code 
+        (match op with
+           A.Add     -> '+'
+         | A.Sub     -> '-'
+         | A.Mult    -> '*'
+         | A.Div     -> '/'
+         | _         -> '_'
+        )) in
+        let des1 = L.build_bitcast e1' img_t "tmp" builder in
+        let des2 = L.build_bitcast e2' img_t "tmp" builder in
+        let des3 = L.build_bitcast e3' i8_t "tmp" builder in
+        L.build_call imgOperator_func [| des1; des2; des3|] "imgOperator" builder
       | SBinop (e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2 in
@@ -738,6 +788,18 @@ let translate program =
         let des1 = L.build_bitcast e1' mat_t "tmp" builder in
         let des2 = L.build_bitcast e2' mat_t "tmp" builder in
         L.build_call matMul_func [| des1; des2 |] "matMul" builder
+      | SCall ("matAssign", [e1;e2]) ->
+        let e1' = expr (local_vars, builder) e1 in
+        let e2' = expr (local_vars, builder) e2 in
+        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
+        let des2 = L.build_bitcast e2' float_t "tmp" builder in
+        L.build_call matAssign_func [| des1; des2 |] "matAssign" builder
+      | SCall ("imgAssign", [e1;e2]) ->
+        let e1' = expr (local_vars, builder) e1 in
+        let e2' = expr (local_vars, builder) e2 in
+        let des1 = L.build_bitcast e1' img_t "tmp" builder in
+        let des2 = L.build_bitcast e2' i32_t "tmp" builder in
+        L.build_call imgAssign_func [| des1; des2 |] "imgAssign" builder
       | (SCall ("aveFilter", [e1;e2]) | SCall("edgeDetection", [e1;e2])) as f->
         let e1' = expr (local_vars, builder) e1 in
         let e2' = expr (local_vars, builder) e2 in

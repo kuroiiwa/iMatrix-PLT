@@ -258,12 +258,20 @@ let check program =
       let same = t1 = t2 in
       (* Determine expression type based on operator and operand types *)
       let ty = match op with
-          Add | Sub | Mult | Div | Mod | Pow when same && t1 = Int   -> Int
-        | Add | Sub | Mult | Div | Pow when same && t1 = Float -> Float
-        | Equal | Neq            when same               -> Bool
+          Add | Sub | Mult | Div | Mod | Pow 
+          when same && t1 = Int -> Int
+        | Add | Sub | Mult | Div | Pow 
+          when same && t1 = Float -> Float
+        | Equal | Neq            
+          when same -> Bool
         | Less | Leq | Greater | Geq
           when same && (t1 = Int || t1 = Float) -> Bool
-        | And | Or when same && t1 = Bool -> Bool
+        | And | Or 
+          when same && t1 = Bool -> Bool
+        | Add | Sub | Mult | Div 
+          when same && t1 = Mat -> Mat
+        | Add | Sub | Mult | Div 
+          when same && t1 = Img -> Img
         | _ -> raise (
             Failure ("illegal binary operator " ^
                      string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
@@ -271,6 +279,10 @@ let check program =
       in (ty, SBinop((t1, e1'), op, (t2, e2')))
     | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call("matMul", [e1;e2]) -> (Mat, SCall("matMul", [check_expr (var_symbols, func_symbols) e1;
+                                                        check_expr (var_symbols, func_symbols) e2]))
+    | Call("matAssign", [e1;e2]) -> (Mat, SCall("matAssign", [check_expr (var_symbols, func_symbols) e1;
+                                                        check_expr (var_symbols, func_symbols) e2]))
+    | Call("imgAssign", [e1;e2]) -> (Img, SCall("imgAssign", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
     | Call("aveFilter", [e1;e2]) -> (Img, SCall("aveFilter", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
