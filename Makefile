@@ -5,5 +5,8 @@ PACKS = llvm llvm.analysis
 all: native-code
 	$(MAKE) -C ./lib
 
+clean::
+	cd ./lib && $(MAKE) clean
+
 OCAMLMAKEFILE = OCamlMakefile
 -include OCamlMakefile
