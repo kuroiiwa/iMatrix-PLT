@@ -1,0 +1,10 @@
+int main()
+{
+	img a(2,4);
+	img b(2,4);
+	imgAssign(a, 2);
+	imgAssign(b, 5);
+	print(b-a);
+	
+	return 0;
+}

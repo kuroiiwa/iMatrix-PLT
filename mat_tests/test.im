@@ -1,0 +1,8 @@
+int main()
+{
+	mat a(5,3);
+	matAssign(a,1.0);
+	print(row(a));
+	print(col(a));
+	return 0;
+}

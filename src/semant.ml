@@ -277,20 +277,14 @@ let check program =
                      string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
       in (ty, SBinop((t1, e1'), op, (t2, e2')))
-    | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
-    | Call("matMul", [e1;e2]) -> (Mat, SCall("matMul", [check_expr (var_symbols, func_symbols) e1;
-                                                        check_expr (var_symbols, func_symbols) e2]))
+    | Call("print", [e]) -> 
+      (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
+    | Call("row", [e]) -> 
+      (Int, SCall("row", [check_expr (var_symbols, func_symbols) e]))
+    | Call("col", [e]) -> 
+      (Int, SCall("col", [check_expr (var_symbols, func_symbols) e]))
     (*
-    | Call("matAssign", [e1;e2]) -> (Mat, SCall("matAssign", [check_expr (var_symbols, func_symbols) e1;
-                                                        check_expr (var_symbols, func_symbols) e2]))
-    | Call("imgAssign", [e1;e2]) -> (Img, SCall("imgAssign", [check_expr (var_symbols, func_symbols) e1;
-                                                        check_expr (var_symbols, func_symbols) e2]))
-    *)
-    | Call("aveFilter", [e1;e2]) -> (Img, SCall("aveFilter", [check_expr (var_symbols, func_symbols) e1;
-                                                        check_expr (var_symbols, func_symbols) e2]))
-    | Call("edgeDetection", [e1;e2]) -> (Img, SCall("edgeDetection", [check_expr (var_symbols, func_symbols) e1;
-                                                        check_expr (var_symbols, func_symbols) e2]))
-    (*       let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
+           let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
              let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
              let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
              let check_typ_helper = function Mat(_) -> () 
@@ -422,13 +416,15 @@ let check program =
         formals = collect_formals l;
         body = [] } map
     in List.fold_left add_bind StringMap.empty [
-      (Void, "print", [Int]);
-      (Mat, "malloc_mat", [Int; Int]);
-      (Img, "malloc_img", [Int; Int]);
-      (Void, "free_mat", [Mat]);
-      (Void, "free_img", [Img]);
-      (Mat, "matAssign", [Mat, Float]);
-      (Img, "imgAssign", [Img, Int])
+      (Mat,   "malloc_mat",   [Int; Int]);
+      (Img,   "malloc_img",   [Int; Int]);
+      (Void,  "free_mat",     [Mat]);
+      (Void,  "free_img",     [Img]);
+      (Mat,   "matAssign",    [Mat; Float]);
+      (Mat,   "matMul",       [Mat; Mat]);
+      (Img,   "imgAssign",    [Img; Int]);
+      (Img,   "aveFilter",    [Img; Int]);
+      (Img,   "edgeDetection",[Img; Int]);
       ]
   in
 

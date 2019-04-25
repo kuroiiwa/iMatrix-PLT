@@ -3,6 +3,7 @@ SOURCES = src/scanner.mll src/microcparse.mly src/ast.ml src/semant.ml src/sast.
 PACKS = llvm llvm.analysis
 
 all: native-code
+	$(MAKE) -C ./lib
 
 OCAMLMAKEFILE = OCamlMakefile
 -include OCamlMakefile

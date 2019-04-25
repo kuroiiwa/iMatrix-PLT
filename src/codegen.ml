@@ -211,54 +211,54 @@ let translate program =
   let __setImgVal_func : L.llvalue =
     L.declare_function "__setImgVal" __setImgVal_t the_module in
 
-  let matMul_t : L.lltype = 
-    L.function_type mat_t [| mat_t; mat_t|] in
-  let matMul_func : L.llvalue = 
-    L.declare_function "matMul" matMul_t the_module in
-
-  let matOperator_t : L.lltype = 
+(*   let matOperator_t : L.lltype = 
     L.function_type mat_t [| mat_t; mat_t; i8_t|] in
   let matOperator_func : L.llvalue = 
     L.declare_function "matOperator" matOperator_t the_module in
-
-  let matAssign_t : L.lltype = 
-    L.function_type mat_t [| mat_t; float_t|] in
-  let matAssign_func : L.llvalue = 
-    L.declare_function "matAssign" matAssign_t the_module in
 
   let imgOperator_t : L.lltype = 
     L.function_type img_t [| img_t; img_t; i8_t|] in
   let imgOperator_func : L.llvalue = 
     L.declare_function "imgOperator" imgOperator_t the_module in
+ *)
 
-  let imgAssign_t : L.lltype = 
-    L.function_type img_t [| img_t; i32_t|] in
-  let imgAssign_func : L.llvalue = 
-    L.declare_function "imgAssign" imgAssign_t the_module in
+  let internal_funcs =
+    let func_info = [
+      ("matOperator", mat_t, [| mat_t; mat_t; i8_t|]);
+      ("imgOperator", img_t, [| img_t; img_t; i8_t|]);
+      ("__matRow",      i32_t, [| mat_t |]);
+      ("__matCol",      i32_t, [| mat_t |]);
+      ("__imgRow",      i32_t, [| img_t |]);
+      ("__imgCol",      i32_t, [| img_t |]);
+    ] in
+    let add_internal_func m (name, return_ty, para_tylist) =
+      let llty = L.function_type return_ty para_tylist in
+      let func = L.declare_function name llty the_module in
+      StringMap.add name func m
+    in
+    List.fold_left add_internal_func StringMap.empty func_info
+  in
 
-  let aveFilter_t : L.lltype = 
-    L.function_type img_t [| img_t; i32_t|] in
-  let aveFilter_func : L.llvalue = 
-    L.declare_function "aveFilter" aveFilter_t the_module in
 
-  let edgeDetection_t : L.lltype = 
-    L.function_type img_t [| img_t ; i32_t|] in
-  let edgeDetection_func : L.llvalue = 
-    L.declare_function "edgeDetection" edgeDetection_t the_module in 
-
-  (* buult-in functions for users *)
+  (* built-in functions for users *)
   let builtin_funcs =
     let builtin = [
-      ("malloc_mat", A.Mat, L.function_type mat_t [| i32_t; i32_t|]);
-      ("malloc_img", A.Img, L.function_type img_t [| i32_t; i32_t|]);
-      ("free_mat", A.Void, L.function_type i32_t [| mat_t |]);
-      ("free_img", A.Void, L.function_type i32_t [| img_t |])
+      ("malloc_mat",    A.Mat,  mat_t, [| i32_t; i32_t |]);
+      ("malloc_img",    A.Img,  img_t, [| i32_t; i32_t |]);
+      ("free_mat",      A.Void, i32_t, [| mat_t |]);
+      ("free_img",      A.Void, i32_t, [| img_t |]);
+      ("matAssign",     A.Mat,  mat_t, [| mat_t; float_t |]);
+      ("matMul",        A.Mat,  mat_t, [| mat_t; mat_t |]);
+      ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
+      ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]);
+      ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
     ]
     in
-    let add_builtit m (n, ty, llty) =
-      let func = L.declare_function n llty the_module in
-      let decl = { styp = ty; sfname = n; sformals = []; sbody = []; } in
-      StringMap.add n (func, decl) m
+    let add_builtit m (name, ty, return_ty, para_tylist) =
+      let llty = L.function_type return_ty para_tylist in
+      let func = L.declare_function name llty the_module in
+      let decl = { styp = ty; sfname = name; sformals = []; sbody = []; } in
+      StringMap.add name (func, decl) m
     in
     List.fold_left add_builtit StringMap.empty builtin
   in
@@ -673,6 +673,27 @@ let translate program =
           "" builder
       | _ -> L.build_call __printf_func [| ty_to_format e ; e' |] "" builder
 
+    and call_row (local_vars, builder) e =
+      let e' = expr (local_vars, builder) e
+      and (t, _) = e in
+      let func = match t with
+        | A.Mat -> StringMap.find "__matRow" internal_funcs
+        | A.Img -> StringMap.find "__imgRow" internal_funcs
+        | _ -> raise(InternalError("row() function unexpectec input"))
+      in
+      L.build_call func [| e' |] "row" builder
+
+    and call_col (local_vars, builder) e =
+      let e' = expr (local_vars, builder) e
+      and (t, _) = e in
+      let func = match t with
+        | A.Mat -> StringMap.find "__matCol" internal_funcs
+        | A.Img -> StringMap.find "__imgCol" internal_funcs
+        | _ -> raise(InternalError("col() function unexpectec input"))
+      in
+      L.build_call func [| e' |] "col" builder
+
+
 
     (* Construct code for an expression; return its value *)
     and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
@@ -756,6 +777,7 @@ let translate program =
          | A.And | A.Or | A.Mod | A.Pow->
            raise (InternalError "internal error: semant should have rejected and/or on float")
         ) e1' e2' "tmp" builder
+
       | SBinop ((A.Mat,_ ) as e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2
@@ -770,7 +792,10 @@ let translate program =
         let des1 = L.build_bitcast e1' mat_t "tmp" builder in
         let des2 = L.build_bitcast e2' mat_t "tmp" builder in
         let des3 = L.build_bitcast e3' i8_t "tmp" builder in
-        L.build_call matOperator_func [| des1; des2; des3|] "matOperator" builder
+        let func = StringMap.find "matOperator" internal_funcs in
+        L.build_call func [| des1; des2; des3|] "matOperator" builder
+        (* L.build_call matOperator_func [| des1; des2; des3|] "matOperator" builder *)
+
       | SBinop ((A.Img,_ ) as e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2
@@ -785,8 +810,9 @@ let translate program =
         let des1 = L.build_bitcast e1' img_t "tmp" builder in
         let des2 = L.build_bitcast e2' img_t "tmp" builder in
         let des3 = L.build_bitcast e3' i8_t "tmp" builder in
-        L.build_call imgOperator_func [| des1; des2; des3|] "imgOperator" builder
-        ) e1' e2' "_t" builder
+        let func = StringMap.find "imgOperator" internal_funcs in
+        L.build_call func [| des1; des2; des3|] "imgOperator" builder
+
       | SBinop (e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2 in
@@ -806,41 +832,21 @@ let translate program =
          | A.Geq     -> L.build_icmp L.Icmp.Sge
          | A.Pow     ->  raise (InternalError "internal error: Power for int not supported yet")
         ) e1' e2' "_t" builder
+
       | SUnop(op, ((t, _) as e)) ->
         let e' = expr (local_vars, builder) e in
         (match op with
            A.Neg when t = A.Float -> L.build_fneg 
          | A.Neg                  -> L.build_neg
          | A.Not                  -> L.build_not) e' "_t" builder
+
       | SCall ("print", [e]) ->
         call_print (local_vars, builder) e
-      | SCall ("matMul", [e1;e2]) ->
-        let e1' = expr (local_vars, builder) e1 in
-        let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' mat_t "_t" builder in
-        let des2 = L.build_bitcast e2' mat_t "_t" builder in
-        L.build_call matMul_func [| des1; des2 |] "matMul" builder
-      | SCall ("matAssign", [e1;e2]) ->
-        let e1' = expr (local_vars, builder) e1 in
-        let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
-        let des2 = L.build_bitcast e2' float_t "tmp" builder in
-        L.build_call matAssign_func [| des1; des2 |] "matAssign" builder
-      | SCall ("imgAssign", [e1;e2]) ->
-        let e1' = expr (local_vars, builder) e1 in
-        let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' img_t "tmp" builder in
-        let des2 = L.build_bitcast e2' i32_t "tmp" builder in
-        L.build_call imgAssign_func [| des1; des2 |] "imgAssign" builder
-      | (SCall ("aveFilter", [e1;e2]) | SCall("edgeDetection", [e1;e2])) as f->
-        let e1' = expr (local_vars, builder) e1 in
-        let e2' = expr (local_vars, builder) e2 in
-        let des1 = L.build_bitcast e1' img_t "_t" builder in
-        let des2 = L.build_bitcast e2' i32_t "_t" builder in
-        (match f with
-         | SCall ("aveFilter",_) -> L.build_call aveFilter_func [| des1; des2 |] "aveFilter" builder
-         | SCall ("edgeDetection",_) -> L.build_call edgeDetection_func [| des1; des2 |] "edgeDetection" builder
-         | _ -> raise(InternalError("internel error: unsupported function detected")))
+      | SCall ("row", [e]) ->
+        call_row (local_vars, builder) e
+      | SCall ("col", [e]) ->
+        call_col (local_vars, builder) e
+
       | SCall (f, args) ->
         let (fdef, fdecl) = StringMap.find f function_decls in
         let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in

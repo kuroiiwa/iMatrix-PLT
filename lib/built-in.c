@@ -45,6 +45,11 @@ void printImg(struct img* a) {
 	}
 }
 
+int __matRow(struct mat* a) { return a->row; }
+int __matCol(struct mat* a) { return a->col; }
+int __imgRow(struct img* a) { return a->row; }
+int __imgCol(struct img* a) { return a->col; }
+
 float __returnMatVal(struct mat* a, int r, int c) {
 	assert(a != NULL);
 	return a->data[r][c];

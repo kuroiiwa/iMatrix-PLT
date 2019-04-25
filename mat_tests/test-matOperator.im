@@ -1,0 +1,11 @@
+int main()
+{
+	mat a(2,4);
+	mat b(2,4);
+	matAssign(a, 2.0);
+	matAssign(b, 5.0);
+	a = a+b;
+	print(a);
+
+	return 0;
+}
