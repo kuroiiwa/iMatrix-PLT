@@ -280,10 +280,12 @@ let check program =
     | Call("print", [e]) -> (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call("matMul", [e1;e2]) -> (Mat, SCall("matMul", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
+    (*
     | Call("matAssign", [e1;e2]) -> (Mat, SCall("matAssign", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
     | Call("imgAssign", [e1;e2]) -> (Img, SCall("imgAssign", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
+    *)
     | Call("aveFilter", [e1;e2]) -> (Img, SCall("aveFilter", [check_expr (var_symbols, func_symbols) e1;
                                                         check_expr (var_symbols, func_symbols) e2]))
     | Call("edgeDetection", [e1;e2]) -> (Img, SCall("edgeDetection", [check_expr (var_symbols, func_symbols) e1;
@@ -424,7 +426,10 @@ let check program =
       (Mat, "malloc_mat", [Int; Int]);
       (Img, "malloc_img", [Int; Int]);
       (Void, "free_mat", [Mat]);
-      (Void, "free_img", [Img])]
+      (Void, "free_img", [Img]);
+      (Mat, "matAssign", [Mat, Float]);
+      (Img, "imgAssign", [Img, Int])
+      ]
   in
 
   (**** Add func to func_symbols with error handler ****)
