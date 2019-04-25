@@ -151,31 +151,6 @@ let translate program =
   let __printf_func : L.llvalue = 
     L.declare_function "printf" __printf_t the_module in
 
-  let __printIntArr_t : L.lltype =
-    L.function_type i32_t [| array3_i32_t ; i32_t ; i32_t ; i32_t |] in
-  let __printIntArr_func : L.llvalue =
-    L.declare_function "__printIntArr" __printIntArr_t the_module in
-
-  let __printFloatArr_t : L.lltype =
-    L.function_type i32_t [| array3_float_t ; i32_t ; i32_t ; i32_t |] in
-  let __printFloatArr_func : L.llvalue =
-    L.declare_function "__printFloatArr" __printFloatArr_t the_module in
-
-  let __printCharArr_t : L.lltype =
-    L.function_type i32_t [| array3_i8_t ; i32_t ; i32_t ; i32_t |] in
-  let __printCharArr_func : L.llvalue =
-    L.declare_function "__printCharArr" __printCharArr_t the_module in
-
-  let __printMat_t : L.lltype =
-    L.function_type i32_t [| mat_t |] in
-  let __printMat_func : L.llvalue =
-    L.declare_function "printMat" __printMat_t the_module in
-
-  let __printImg_t : L.lltype =
-    L.function_type i32_t [| img_t |] in
-  let __printImg_func : L.llvalue =
-    L.declare_function "printImg" __printImg_t the_module in
-
   let __setIntArray_t : L.lltype =
     L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
   let __setIntArray_func : L.llvalue =
@@ -211,21 +186,16 @@ let translate program =
   let __setImgVal_func : L.llvalue =
     L.declare_function "__setImgVal" __setImgVal_t the_module in
 
-(*   let matOperator_t : L.lltype = 
-    L.function_type mat_t [| mat_t; mat_t; i8_t|] in
-  let matOperator_func : L.llvalue = 
-    L.declare_function "matOperator" matOperator_t the_module in
-
-  let imgOperator_t : L.lltype = 
-    L.function_type img_t [| img_t; img_t; i8_t|] in
-  let imgOperator_func : L.llvalue = 
-    L.declare_function "imgOperator" imgOperator_t the_module in
- *)
-
   let internal_funcs =
     let func_info = [
-      ("matOperator", mat_t, [| mat_t; mat_t; i8_t|]);
-      ("imgOperator", img_t, [| img_t; img_t; i8_t|]);
+      ("__printIntArr",   i32_t, [| array3_i32_t;   i32_t; i32_t; i32_t |]);
+      ("__printFloatArr", i32_t, [| array3_float_t; i32_t; i32_t; i32_t |]);
+      ("__printCharArr",  i32_t, [| array3_i8_t;    i32_t; i32_t; i32_t |]);
+      ("__printMat",      i32_t, [| mat_t |]);
+      ("__printImg",      i32_t, [| img_t |]);
+
+      ("__matOperator", mat_t, [| mat_t; mat_t; i8_t |]);
+      ("__imgOperator", img_t, [| img_t; img_t; i8_t |]);
       ("__matRow",      i32_t, [| mat_t |]);
       ("__matCol",      i32_t, [| mat_t |]);
       ("__imgRow",      i32_t, [| img_t |]);
@@ -651,26 +621,26 @@ let translate program =
       let e' = expr(local_vars, builder) e
       and (t, _) = e in
       match t with
-      | A.Mat -> L.build_call __printMat_func [| e' |] "" builder
-      | A.Img -> L.build_call __printImg_func [| e' |] "" builder
-      | A.Array(_) when get_type_arr t = A.Int ->
-        let (t,_) = e in
+      | A.Mat -> 
+        let func =  StringMap.find "__printMat" internal_funcs in
+        L.build_call func [| e' |] "" builder
+      | A.Img -> 
+        let func =  StringMap.find "__printImg" internal_funcs in
+        L.build_call func [| e' |] "" builder
+      | A.Array(_) ->
+        let (array_ty, funcName) = match get_type_arr t with
+          | A.Int   -> (array3_i32_t,   "__printIntArr")
+          | A.Float -> (array3_float_t, "__printFloatArr")
+          | A.Char  -> (array3_i8_t,    "__printCharArr")
+          | _ -> raise(InternalError("print unexpected"))
+        in
         let ar = extDim t in
-        let des = L.build_bitcast e' array3_i32_t "_t" builder in
-        L.build_call __printIntArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-          "" builder
-      | A.Array(_) when get_type_arr t = A.Float ->
-        let (t,_) = e in
-        let ar = extDim t in
-        let des = L.build_bitcast e' array3_float_t "_t" builder in
-        L.build_call __printFloatArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-          "" builder
-      | A.Array(_) when get_type_arr t = A.Char ->
-        let (t,_) = e in
-        let ar = extDim t in
-        let des = L.build_bitcast e' array3_i8_t "_t" builder in
-        L.build_call __printCharArr_func [| des; L.const_int i32_t ar.(0) ; L.const_int i32_t ar.(1) ; L.const_int i32_t ar.(2) |]
-          "" builder
+        let des = L.build_bitcast e' array_ty "_t" builder in
+        let func = StringMap.find funcName internal_funcs in
+        L.build_call func [| des; 
+          L.const_int i32_t ar.(0) ; 
+          L.const_int i32_t ar.(1) ; 
+          L.const_int i32_t ar.(2) |] "" builder
       | _ -> L.build_call __printf_func [| ty_to_format e ; e' |] "" builder
 
     and call_row (local_vars, builder) e =
@@ -778,7 +748,7 @@ let translate program =
            raise (InternalError "internal error: semant should have rejected and/or on float")
         ) e1' e2' "tmp" builder
 
-      | SBinop ((A.Mat,_ ) as e1, op, e2) ->
+      | SBinop ((ty,_ ) as e1, op, e2) when ty=A.Mat||ty=A.Img ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2
         and e3' = L.const_int i8_t (Char.code 
@@ -789,29 +759,15 @@ let translate program =
          | A.Div     -> '/'
          | _         -> '_'
         )) in
-        let des1 = L.build_bitcast e1' mat_t "tmp" builder in
-        let des2 = L.build_bitcast e2' mat_t "tmp" builder in
+        let (llty, funcName) = if ty=A.Mat 
+          then (mat_t, "__matOperator") 
+          else (img_t, "__imgOperator")
+        in
+        let des1 = L.build_bitcast e1' llty "tmp" builder in
+        let des2 = L.build_bitcast e2' llty "tmp" builder in
         let des3 = L.build_bitcast e3' i8_t "tmp" builder in
-        let func = StringMap.find "matOperator" internal_funcs in
-        L.build_call func [| des1; des2; des3|] "matOperator" builder
-        (* L.build_call matOperator_func [| des1; des2; des3|] "matOperator" builder *)
-
-      | SBinop ((A.Img,_ ) as e1, op, e2) ->
-        let e1' = expr (local_vars, builder) e1
-        and e2' = expr (local_vars, builder) e2
-        and e3' = L.const_int i8_t (Char.code 
-        (match op with
-           A.Add     -> '+'
-         | A.Sub     -> '-'
-         | A.Mult    -> '*'
-         | A.Div     -> '/'
-         | _         -> '_'
-        )) in
-        let des1 = L.build_bitcast e1' img_t "tmp" builder in
-        let des2 = L.build_bitcast e2' img_t "tmp" builder in
-        let des3 = L.build_bitcast e3' i8_t "tmp" builder in
-        let func = StringMap.find "imgOperator" internal_funcs in
-        L.build_call func [| des1; des2; des3|] "imgOperator" builder
+        let func = StringMap.find funcName internal_funcs in
+        L.build_call func [| des1; des2; des3|] "tmp" builder
 
       | SBinop (e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1

@@ -2,10 +2,12 @@ int main()
 {
 	mat a(2,4);
 	mat b(2,4);
-	matAssign(a, 2.0);
-	matAssign(b, 5.0);
-	a = a+b;
-	print(a);
+	matAssign(a, 5.0);
+	matAssign(b, 2.0);
+	print(a+b);
+	print(a-b);
+	print(a*b);
+	print(a/b);
 
 	return 0;
 }

@@ -23,9 +23,9 @@ struct mat {
 // };
 
 
-void printMat(struct mat* a) {
+void __printMat(struct mat* a) {
 	assert(a != NULL);
-	printf("row: %d col: %d \n\n", a->row, a->col);
+	printf("\nrow: %d col: %d \n", a->row, a->col);
 	for (int i = 0; i < a->row; i++) {
 		for (int j = 0; j < a->col; j++)
 			printf("%lf ", a->data[i][j]);
@@ -33,15 +33,15 @@ void printMat(struct mat* a) {
 	}
 }
 
-void printImg(struct img* a) {
-	printf("row: %d col: %d \n\n", a->row, a->col);
+void __printImg(struct img* a) {
+	printf("\nrow: %d col: %d \n", a->row, a->col);
 	for (int k = 0; k < 3; k++) {
 		for (int i = 0; i < a->row; i++) {
 			for (int j = 0; j < a->col; j++)
-			printf("%d ", a->data[i][j][k]);
-		printf("\n");
+				printf("%d ", a->data[i][j][k]);
+			printf("\n");
 		}
-	printf("\n");
+		printf("\n");
 	}
 }
 
@@ -438,7 +438,7 @@ struct mat* matAssign(struct mat* m, double val) {
 	return m;
 }
 
-struct mat* matOperator(struct mat* m1, struct mat* m2, char op) {
+struct mat* __matOperator(struct mat* m1, struct mat* m2, char op) {
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
 	int r = m1->row, c = m1->col;
@@ -465,7 +465,7 @@ struct img* imgAssign(struct img* m, int val) {
 	return m;
 }
 
-struct img* imgOperator(struct img* m1, struct img* m2, char op) {
+struct img* __imgOperator(struct img* m1, struct img* m2, char op) {
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
 	int r = m1->row, c = m1->col;

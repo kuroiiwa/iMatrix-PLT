@@ -1,8 +1,13 @@
 int main()
 {
-	mat a(5,3);
-	matAssign(a,1.0);
-	print(row(a));
-	print(col(a));
+	img a(2,4);
+	img b(2,4);
+	imgAssign(a, 2);
+	imgAssign(b, 5);
+	print(a+b);
+	print(a-b);
+	print(a*b);
+	print(a/b);
+		
 	return 0;
 }
