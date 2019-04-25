@@ -151,6 +151,7 @@ let translate program =
   let __printf_func : L.llvalue = 
     L.declare_function "printf" __printf_t the_module in
 
+
   let __setIntArray_t : L.lltype =
     L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
   let __setIntArray_func : L.llvalue =
@@ -171,20 +172,7 @@ let translate program =
   let __returnMatVal_func : L.llvalue =
     L.declare_function "__returnMatVal" __returnMatVal_t the_module in
 
-  let __returnImgVal_t : L.lltype =
-    L.function_type i32_t [| img_t; i32_t ; i32_t; i32_t |] in
-  let __returnImgVal_func : L.llvalue =
-    L.declare_function "__returnImgVal" __returnImgVal_t the_module in
 
-  let __setMatVal_t : L.lltype =
-    L.function_type i32_t [| float_t; mat_t; i32_t ; i32_t |] in
-  let __setMatVal_func : L.llvalue =
-    L.declare_function "__setMatVal" __setMatVal_t the_module in
-
-  let __setImgVal_t : L.lltype =
-    L.function_type i32_t [| i32_t; img_t; i32_t ; i32_t; i32_t |] in
-  let __setImgVal_func : L.llvalue =
-    L.declare_function "__setImgVal" __setImgVal_t the_module in
 
   let internal_funcs =
     let func_info = [
@@ -193,6 +181,13 @@ let translate program =
       ("__printCharArr",  i32_t, [| array3_i8_t;    i32_t; i32_t; i32_t |]);
       ("__printMat",      i32_t, [| mat_t |]);
       ("__printImg",      i32_t, [| img_t |]);
+      ("__setIntArray",   i32_t, [|i32_t; array3_i32_t; array3_i32_t; i32_t; array1_i32_t |]);
+      ("__setFloArray",   i32_t, [|i32_t; array3_float_t; array3_float_t; i32_t; array1_i32_t |]);
+      ("__setMat",        i32_t, [|mat_t; array2_float_t; i32_t; i32_t|]);
+      ("__returnMatVal",  float_t, [| mat_t; i32_t; i32_t |]);
+      ("__returnImgVal",  i32_t, [| img_t; i32_t; i32_t; i32_t |]);
+      ("__setMatVal",     i32_t, [| float_t; mat_t; i32_t; i32_t |]);
+      ("__setImgVal",     i32_t, [| i32_t; img_t; i32_t; i32_t; i32_t |]);
 
       ("__matOperator", mat_t, [| mat_t; mat_t; i8_t |]);
       ("__imgOperator", img_t, [| img_t; img_t; i8_t |]);
@@ -207,6 +202,11 @@ let translate program =
       StringMap.add name func m
     in
     List.fold_left add_internal_func StringMap.empty func_info
+  in
+
+  let builtin_f n =
+    try StringMap.find n internal_funcs
+    with Not_found -> raise(InternalError("built-in funciton not found"))
   in
 
 
@@ -465,7 +465,7 @@ let translate program =
         and (b,_) = List.nth index_l 1 in
         let a' = expr (vars, builder) a
         and b' = expr (vars, builder) b in
-        L.build_call __returnMatVal_func [| orig; a'; b'|] "" builder
+        L.build_call (builtin_f "__returnMatVal") [| orig; a'; b'|] "" builder
       else if ltyp = img_t then
         let (a,_) = List.hd index_l
         and (b,_) = List.nth index_l 1
@@ -473,7 +473,7 @@ let translate program =
         let a' = expr (vars, builder) a
         and b' = expr (vars, builder) b 
         and c' = expr (vars, builder) c in
-        L.build_call __returnImgVal_func [| orig; a'; b'; c'|] "" builder
+        L.build_call (builtin_f "__returnImgVal") [| orig; a'; b'; c'|] "" builder
       else copy_slice orig index_l (vars, builder) true
 
       (* copy slicing for array *)
@@ -566,7 +566,7 @@ let translate program =
         and (b,_) = List.nth index_l 1 in
         let a' = expr (local_vars, builder) a
         and b' = expr (local_vars, builder) b in
-        L.build_call __setMatVal_func [| e'; dst; a'; b'|] "" builder
+        L.build_call (builtin_f "__setMatVal") [| e'; dst; a'; b'|] "" builder
       else if ltyp = img_t then
         let e' = expr (local_vars, builder) re in
         let (a,_) = List.hd index_l
@@ -575,7 +575,7 @@ let translate program =
         let a' = expr (local_vars, builder) a
         and b' = expr (local_vars, builder) b 
         and c' = expr (local_vars, builder) c in
-        L.build_call __setImgVal_func [| e'; dst; a'; b'; c'|] "" builder
+        L.build_call (builtin_f "__setImgVal") [| e'; dst; a'; b'; c'|] "" builder
       else set_slice (local_vars, builder) (dst, index_l, re) ty 
 
     and set_slice (local_vars, builder) (dst, lst, re) ty = 
@@ -608,11 +608,13 @@ let translate program =
        | A.Int ->
          let res' = L.build_bitcast res array3_i32_t "res" builder
          and des' = L.build_bitcast dst array3_i32_t "des" builder in
-         L.build_call __setIntArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
+         L.build_call (builtin_f "__setIntArray") 
+         [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setIntArray" builder
        | A.Float -> 
          let res' = L.build_bitcast res array3_float_t "res" builder
          and des' = L.build_bitcast dst array3_float_t "des" builder in
-         L.build_call __setFloArray_func [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
+         L.build_call (builtin_f "__setFloArray") 
+         [| dimdiff; des' ; res' ; L.const_int i32_t depth ; slice_info |] "__setFloArray" builder
        | _ as t -> raise(InternalError(A.string_of_typ t ^ " type does not support slicing copy")))
 
 
@@ -651,7 +653,7 @@ let translate program =
         | A.Img -> StringMap.find "__imgRow" internal_funcs
         | _ -> raise(InternalError("row() function unexpectec input"))
       in
-      L.build_call func [| e' |] "row" builder
+      L.build_call func [| e' |] "_row" builder
 
     and call_col (local_vars, builder) e =
       let e' = expr (local_vars, builder) e
@@ -661,7 +663,7 @@ let translate program =
         | A.Img -> StringMap.find "__imgCol" internal_funcs
         | _ -> raise(InternalError("col() function unexpectec input"))
       in
-      L.build_call func [| e' |] "col" builder
+      L.build_call func [| e' |] "_col" builder
 
 
 
@@ -705,7 +707,7 @@ let translate program =
          | A.Mat,A.Array(_),_ ->
           let e' = expr (local_vars, builder) se2 in
           let ar = extDim t in
-          L.build_call __setMat_func [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+          L.build_call (builtin_f "__setMat") [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
          | A.Img,A.Array(_),_ -> raise NotImplemented
          | _ -> let e' = expr (local_vars, builder) se2 in
            ignore(L.build_store e' des builder); e')
@@ -719,7 +721,7 @@ let translate program =
             | A.Mat -> L.build_store e' (lookup local_vars s) builder
             | A.Array(_) ->
           let ar = extDim t in
-          L.build_call __setMat_func [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+          L.build_call (builtin_f "__setMat") [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
             | _ -> raise(InternalError("Assign type failure"))
           )
         else if L.type_of des = img_t then
@@ -933,4 +935,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
+  ignore(L.dump_module the_module);
   the_module

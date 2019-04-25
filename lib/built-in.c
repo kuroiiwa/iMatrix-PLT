@@ -34,6 +34,7 @@ void __printMat(struct mat* a) {
 }
 
 void __printImg(struct img* a) {
+	assert(a != NULL);
 	printf("\nrow: %d col: %d \n", a->row, a->col);
 	for (int k = 0; k < 3; k++) {
 		for (int i = 0; i < a->row; i++) {
@@ -45,10 +46,10 @@ void __printImg(struct img* a) {
 	}
 }
 
-int __matRow(struct mat* a) { return a->row; }
-int __matCol(struct mat* a) { return a->col; }
-int __imgRow(struct img* a) { return a->row; }
-int __imgCol(struct img* a) { return a->col; }
+int __matRow(struct mat* a) { assert(a != NULL); return a->row; }
+int __matCol(struct mat* a) { assert(a != NULL); return a->col; }
+int __imgRow(struct img* a) { assert(a != NULL); return a->row; }
+int __imgCol(struct img* a) { assert(a != NULL); return a->col; }
 
 float __returnMatVal(struct mat* a, int r, int c) {
 	assert(a != NULL);

@@ -279,10 +279,18 @@ let check program =
       in (ty, SBinop((t1, e1'), op, (t2, e2')))
     | Call("print", [e]) -> 
       (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
-    | Call("row", [e]) -> 
-      (Int, SCall("row", [check_expr (var_symbols, func_symbols) e]))
-    | Call("col", [e]) -> 
-      (Int, SCall("col", [check_expr (var_symbols, func_symbols) e]))
+    | Call("row", [e]) ->
+      let e' = check_expr (var_symbols, func_symbols) e in
+      let (t, _) = e' in
+      (match t with
+        | Mat | Img -> (Int, SCall("row", [e']))
+        | _ -> raise(Failure("row should have mat/img type")))
+    | Call("col", [e]) ->
+      let e' = check_expr (var_symbols, func_symbols) e in
+      let (t, _) = e' in
+      (match t with
+        | Mat | Img -> (Int, SCall("col", [e']))
+        | _ -> raise(Failure("col should have mat/img type")))
     (*
            let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
              let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
