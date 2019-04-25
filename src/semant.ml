@@ -291,47 +291,6 @@ let check program =
       (match t with
         | Mat | Img -> (Int, SCall("col", [e']))
         | _ -> raise(Failure("col should have mat/img type")))
-    (*
-           let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
-             let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
-             let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
-             let check_typ_helper = function Mat(_) -> () 
-             | _ -> raise(Failure("matrix multiplication should only support mat type")) in
-             let check_dim_helper ty1 ty2 ty3 = 
-             let dim_1 = function Mat(f,_) -> f | _ -> raise(Failure("internel error: helper function should get mat as input"))in 
-             let dim_2 = function Mat(_,s) -> s | _ -> raise(Failure("internel error: helper function should get mat as input"))in 
-             if dim_1 ty1 <> dim_1 ty3 then raise (Failure("dimension unmatched in matrix multiplication")) 
-             else (if dim_2 ty1 <> dim_1 ty2 then raise (Failure("dimension unmatched in matrix multiplication"))
-              else(if dim_2 ty2 <> dim_2 ty3 then raise (Failure("dimension unmatched in matrix multiplication"))
-                   else ()))
-             in
-             ignore(check_typ_helper ty1);
-             ignore(check_typ_helper ty2);
-             ignore(check_typ_helper ty3);
-             ignore( check_dim_helper ty1 ty2 ty3);
-             (Void, SCall("matMul", [(ty1,e1');(ty2,e2');(ty3,e3')])) *)
-    (*     | ( Call("aveFilter", [e1;e2;e3])
-           | Call("edgeDetection", [e1;e2;e3])) as f ->
-           let (ty1, e1') = check_expr (var_symbols, func_symbols) e1 in
-           let (ty2, e2') = check_expr (var_symbols, func_symbols) e2 in
-           let (ty3, e3') = check_expr (var_symbols, func_symbols) e3 in
-           let check_typ_helper1 = function Img(_) -> () 
-            | _ -> raise(Failure("image processing functions should only support img type")) in
-           let check_typ_helper2 = function Int -> () 
-            | _ -> raise(Failure("this parameter should have int type")) in
-           let check_dim_helper ty1 ty2 = 
-            let get_dim = function Img(d1,d2,d3) -> (d1,d2,d3) 
-              | _ -> raise(Failure("internel error: helper function should get mat as input")) in 
-            if get_dim ty1 <> get_dim ty2 then raise(Failure("dimension error: input image doesn't match with output image"))
-            else () in
-           ignore(check_typ_helper1 ty1);
-           ignore(check_typ_helper1 ty2);
-           ignore(check_typ_helper2 ty3);
-           ignore(check_dim_helper ty1 ty2);
-           (match f with
-           | Call("aveFilter",_) -> (Void, SCall("aveFilter", [(ty1, e1');(ty2, e2');(ty3, e3')]))  
-           | Call("edgeDetection",_) -> (Void, SCall("edgeDetection", [(ty1, e1');(ty2, e2');(ty3, e3')]))      
-           | _ -> raise(Failure("internel error: unsupported function detected"))) *)
     | Call(fname, args) as call -> 
       let fd = find_func func_symbols fname in
       let param_length = List.length fd.formals in

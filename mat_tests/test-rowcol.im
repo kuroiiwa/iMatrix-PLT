@@ -1,0 +1,11 @@
+int main()
+{
+	mat a(2,4);
+	print(col(a));
+	print(row(a));
+	img b(2,4);
+	print(col(b));
+	print(row(b));
+
+	return 0;
+}

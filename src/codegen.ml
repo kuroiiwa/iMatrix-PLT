@@ -152,42 +152,22 @@ let translate program =
     L.declare_function "printf" __printf_t the_module in
 
 
-  let __setIntArray_t : L.lltype =
-    L.function_type i32_t [|i32_t; array3_i32_t ; array3_i32_t ; i32_t ; array1_i32_t |] in
-  let __setIntArray_func : L.llvalue =
-    L.declare_function "__setIntArray" __setIntArray_t the_module in
-
-  let __setFloArray_t : L.lltype =
-    L.function_type i32_t [|i32_t; array3_float_t ; array3_float_t ; i32_t ; array1_i32_t |] in
-  let __setFloArray_func : L.llvalue =
-    L.declare_function "__setFloArray" __setFloArray_t the_module in
-
-  let __setMat_t : L.lltype =
-    L.function_type i32_t [|mat_t; array2_float_t; i32_t; i32_t|] in
-  let __setMat_func : L.llvalue =
-    L.declare_function "__setMat" __setMat_t the_module in
-
-  let __returnMatVal_t : L.lltype =
-    L.function_type float_t [| mat_t; i32_t ; i32_t |] in
-  let __returnMatVal_func : L.llvalue =
-    L.declare_function "__returnMatVal" __returnMatVal_t the_module in
-
-
-
   let internal_funcs =
     let func_info = [
+      (* print function *)
       ("__printIntArr",   i32_t, [| array3_i32_t;   i32_t; i32_t; i32_t |]);
       ("__printFloatArr", i32_t, [| array3_float_t; i32_t; i32_t; i32_t |]);
       ("__printCharArr",  i32_t, [| array3_i8_t;    i32_t; i32_t; i32_t |]);
       ("__printMat",      i32_t, [| mat_t |]);
       ("__printImg",      i32_t, [| img_t |]);
-      ("__setIntArray",   i32_t, [|i32_t; array3_i32_t; array3_i32_t; i32_t; array1_i32_t |]);
-      ("__setFloArray",   i32_t, [|i32_t; array3_float_t; array3_float_t; i32_t; array1_i32_t |]);
-      ("__setMat",        i32_t, [|mat_t; array2_float_t; i32_t; i32_t|]);
-      ("__returnMatVal",  float_t, [| mat_t; i32_t; i32_t |]);
-      ("__returnImgVal",  i32_t, [| img_t; i32_t; i32_t; i32_t |]);
+
+      ("__setIntArray",   i32_t, [| i32_t; array3_i32_t;   array3_i32_t; i32_t; array1_i32_t |]);
+      ("__setFloArray",   i32_t, [| i32_t; array3_float_t; array3_float_t; i32_t; array1_i32_t |]);
+      ("__setMat",        i32_t, [| mat_t; array2_float_t; i32_t; i32_t |]);
       ("__setMatVal",     i32_t, [| float_t; mat_t; i32_t; i32_t |]);
-      ("__setImgVal",     i32_t, [| i32_t; img_t; i32_t; i32_t; i32_t |]);
+      ("__setImgVal",     i32_t, [| i32_t;   img_t; i32_t; i32_t; i32_t |]);
+      ("__returnMatVal",  float_t, [| mat_t; i32_t; i32_t |]);
+      ("__returnImgVal",  i32_t,   [| img_t; i32_t; i32_t; i32_t |]);
 
       ("__matOperator", mat_t, [| mat_t; mat_t; i8_t |]);
       ("__imgOperator", img_t, [| img_t; img_t; i8_t |]);
