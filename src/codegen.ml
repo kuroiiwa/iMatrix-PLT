@@ -793,7 +793,24 @@ let translate program =
         call_row (local_vars, builder) e
       | SCall ("col", [e]) ->
         call_col (local_vars, builder) e
-
+      | SCall ("free_mat", [e]) ->
+        (match e with
+          | _,SId(s) ->
+            let e' = expr (local_vars, builder) e in
+            let (fdef, _) = StringMap.find "free_mat" function_decls in
+            ignore(L.build_store (L.const_pointer_null mat_t) (lookup local_vars s) builder);
+            L.build_call fdef [|e'|] "" builder
+          | _ -> raise (InternalError "semant should have rejected illegal arg")
+        )
+      | SCall ("free_img", [e]) ->
+        (match e with
+          | _,SId(s) ->
+            let e' = expr (local_vars, builder) e in
+            let (fdef, _) = StringMap.find "free_img" function_decls in
+            ignore(L.build_store (L.const_pointer_null img_t) (lookup local_vars s) builder);
+            L.build_call fdef [|e'|] "" builder
+          | _ -> raise (InternalError "semant should have rejected illegal arg")
+        )
       | SCall (f, args) ->
         let (fdef, fdecl) = StringMap.find f function_decls in
         let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in

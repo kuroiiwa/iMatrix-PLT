@@ -24,7 +24,8 @@ struct mat {
 
 
 void __printMat(struct mat* a) {
-	assert(a != NULL);
+	assert(a != NULL && "try to print empty matrix");
+	assert(a->row > 0 && a->col > 0);
 	printf("\nrow: %d col: %d \n", a->row, a->col);
 	for (int i = 0; i < a->row; i++) {
 		for (int j = 0; j < a->col; j++)
@@ -122,10 +123,11 @@ void free_img(struct img* i) {
 	}
 	free(i -> data);
 	free(i);
+	i = NULL;
 }
 
 void free_mat(struct mat* m) {
-	assert(m != NULL);
+	assert(m != NULL && "matrix has been freed");
 	const int row = m -> row;
 	const int col = m -> col;
 
@@ -133,7 +135,8 @@ void free_mat(struct mat* m) {
 		free(m -> data[r]);
 	}
 	free(m -> data);
-	free(m);	
+	free(m);
+	m = NULL;
 }
 
 // void free_mat_int(struct mat_int* m) {
