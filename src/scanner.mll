@@ -27,7 +27,7 @@ rule token = parse
 | '^'      { POWER }
 | "++"     { SELFPLUS }
 | "--"     { SELFMINUS }
-(*| "*."     { MATMUL } *)
+| ".*"     { MATMUL }
 | '='      { ASSIGN }                   (* assign *)
 | "=="     { EQ }                       (* logical *)
 | "!="     { NEQ }

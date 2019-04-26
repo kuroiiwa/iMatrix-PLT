@@ -1,7 +1,7 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
 type op = Add | Sub | Mult | Div | Mod | Pow | Equal | Neq | Less | Leq | Greater | Geq |
-          And | Or
+          And | Or | Matmul
 
 type uop = Neg | Not
 
@@ -80,7 +80,7 @@ let string_of_op = function
   | Div -> "/"
   | Mod -> "%"
   | Pow -> "^"
- (* | Matmul -> "*." *)
+  | Matmul -> ".*"
   | Equal -> "=="
   | Neq -> "!="
   | Less -> "<"

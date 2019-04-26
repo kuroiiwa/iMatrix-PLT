@@ -42,7 +42,7 @@ let bind_mat_img typ id (e1, e2) = match typ with
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token SEMI COMMA DOT COLON
-%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS /* MATMUL  */
+%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS MATMUL
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
 %token IF ELSE FOR WHILE /* BREAK CONTINUE */ RETURN
@@ -193,7 +193,7 @@ expr:
   | expr POWER  expr { Binop($1, Pow,   $3)   }
   | SELFPLUS ID      { Assign($2, Binop(Id($2), Add, Literal(1))) }
   | SELFMINUS ID     { Assign($2, Binop(Id($2), Sub, Literal(1))) }
-  /* | expr MATMUL expr { Binop($1, Matmul,   $3)   } */
+  | expr MATMUL expr { Binop($1, Matmul,   $3)}
   | expr EQ     expr { Binop($1, Equal, $3)   }
   | expr NEQ    expr { Binop($1, Neq,   $3)   }
   | expr LT     expr { Binop($1, Less,  $3)   }

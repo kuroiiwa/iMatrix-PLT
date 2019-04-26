@@ -409,12 +409,14 @@ void __printCharArr(char*** start, int row, int col, int layer) {
 }
 
 
-struct mat* matMul(struct mat* m1, struct mat* m2) {
+struct mat* __matMul(struct mat* m1, struct mat* m2) {
 	/* 
 	please make sure the dimension is correct before input parameters
 	A(dim1, dim2) and B(dim2, dim3) are input matrices,
 	C(dim2, dim3) are output matrix
 	*/
+	assert(m1 != NULL && m2 != NULL);
+	assert(m1->col == m2->row);
 	const int dim1 = m1 -> row;
 	const int dim2 = m1 -> col;
 	const int dim3 = m2 -> col;
@@ -440,8 +442,12 @@ struct mat* matAssign(struct mat* m, double val) {
 }
 
 struct mat* __matOperator(struct mat* m1, struct mat* m2, char op) {
+	assert(m1 != NULL && m2 != NULL);
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
+	if (op == 'm') {
+		return __matMul(m1, m2);
+	}
 	int r = m1->row, c = m1->col;
 	struct mat* m3 = malloc_mat(r, c);
 	for (int i = 0; i < r; ++i)
@@ -452,6 +458,7 @@ struct mat* __matOperator(struct mat* m1, struct mat* m2, char op) {
 				case '-': m3->data[i][j] = m1->data[i][j] - m2->data[i][j]; break;
 				case '*': m3->data[i][j] = m1->data[i][j] * m2->data[i][j]; break;
 				case '/': m3->data[i][j] = m1->data[i][j] / m2->data[i][j]; break;
+				default: break;
 			}
 	return m3;
 }
@@ -480,6 +487,7 @@ struct img* __imgOperator(struct img* m1, struct img* m2, char op) {
 					case '-': m3->data[i][j][k] = m1->data[i][j][k] - m2->data[i][j][k]; break;
 					case '*': m3->data[i][j][k] = m1->data[i][j][k] * m2->data[i][j][k]; break;
 					case '/': m3->data[i][j][k] = m1->data[i][j][k] / m2->data[i][j][k]; break;
+					default: break;
 				}
 	return m3;
 }

@@ -175,6 +175,7 @@ let translate program =
       ("__matCol",      i32_t, [| mat_t |]);
       ("__imgRow",      i32_t, [| img_t |]);
       ("__imgCol",      i32_t, [| img_t |]);
+      ("__matMul",      mat_t, [| mat_t; mat_t |]);
     ] in
     let add_internal_func m (name, return_ty, para_tylist) =
       let llty = L.function_type return_ty para_tylist in
@@ -198,7 +199,6 @@ let translate program =
       ("free_mat",      A.Void, i32_t, [| mat_t |]);
       ("free_img",      A.Void, i32_t, [| img_t |]);
       ("matAssign",     A.Mat,  mat_t, [| mat_t; float_t |]);
-      ("matMul",        A.Mat,  mat_t, [| mat_t; mat_t |]);
       ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
       ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]);
       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
@@ -261,9 +261,11 @@ let translate program =
        | A.Leq     -> L.const_fcmp L.Fcmp.Ole
        | A.Greater -> L.const_fcmp L.Fcmp.Ogt
        | A.Geq     -> L.const_fcmp L.Fcmp.Oge
-       | A.And | A.Or | A.Mod | A.Pow ->
-         raise (InternalError("semant should have rejected and/or on float"))
+       | A.And | A.Or | A.Mod | A.Pow | A.Matmul ->
+         raise (InternalError("semant should have rejected illegal op on float"))
       ) e1' e2'
+    | SBinop ((A.Mat,_ ), _, _) | SBinop ((A.Img,_ ), _, _)
+      -> raise (InternalError("semant should have rejected mat/img in global variables"))
     | SBinop (e1, op, e2) ->
       let e1' = expr_val g_vars e1
       and e2' = expr_val g_vars e2 in
@@ -281,7 +283,8 @@ let translate program =
        | A.Leq     -> L.const_icmp L.Icmp.Sle
        | A.Greater -> L.const_icmp L.Icmp.Sgt
        | A.Geq     -> L.const_icmp L.Icmp.Sge
-       | A.Pow     ->  raise (InternalError("Power for int not supported yet"))
+       | A.Pow     ->  raise NotImplemented
+       | _ -> raise (InternalError("semant should have rejected illegal op"))
       ) e1' e2'
     | SUnop(op, ((t, _) as e)) ->
       let e' = expr_val g_vars e in
@@ -529,7 +532,10 @@ let translate program =
               ignore(isPtr := true);
               copy_slice_opt orig l (local_vars, builder) true
             | _ when L.type_of (L.build_load p "_t" builder) = img_t ->
-              raise NotImplemented
+              if !isPtr = true then p else
+              let orig = L.build_load p "_t" builder in
+              ignore(isPtr := true);
+              copy_slice_opt orig l (local_vars, builder) true
             | _ -> List.fold_left deref_ptr p l)
         | _ -> raise(InternalError("getmember error"))
       in
@@ -705,7 +711,11 @@ let translate program =
             | _ -> raise(InternalError("Assign type failure"))
           )
         else if L.type_of des = img_t then
-          raise NotImplemented
+          (match t with
+            | A.Img -> L.build_store e' (lookup local_vars s) builder
+            | A.Array(_) -> raise NotImplemented
+            | _ -> raise(InternalError("Assign type failure"))
+          )
         else
           L.build_store e' (lookup local_vars s) builder
       | SSliceAssign (v, lst, e) ->
@@ -726,8 +736,8 @@ let translate program =
          | A.Leq     -> L.build_fcmp L.Fcmp.Ole
          | A.Greater -> L.build_fcmp L.Fcmp.Ogt
          | A.Geq     -> L.build_fcmp L.Fcmp.Oge
-         | A.And | A.Or | A.Mod | A.Pow->
-           raise (InternalError "internal error: semant should have rejected and/or on float")
+         | A.And | A.Or | A.Mod | A.Pow | A.Matmul ->
+           raise (InternalError "semant should have rejected illegal op on float")
         ) e1' e2' "tmp" builder
 
       | SBinop ((ty,_ ) as e1, op, e2) when ty=A.Mat||ty=A.Img ->
@@ -739,17 +749,15 @@ let translate program =
          | A.Sub     -> '-'
          | A.Mult    -> '*'
          | A.Div     -> '/'
+         | A.Matmul  -> 'm'
          | _         -> '_'
         )) in
         let (llty, funcName) = if ty=A.Mat 
           then (mat_t, "__matOperator") 
           else (img_t, "__imgOperator")
         in
-        let des1 = L.build_bitcast e1' llty "tmp" builder in
-        let des2 = L.build_bitcast e2' llty "tmp" builder in
-        let des3 = L.build_bitcast e3' i8_t "tmp" builder in
         let func = StringMap.find funcName internal_funcs in
-        L.build_call func [| des1; des2; des3|] "tmp" builder
+        L.build_call func [| e1'; e2'; e3'|] "tmp" builder
 
       | SBinop (e1, op, e2) ->
         let e1' = expr (local_vars, builder) e1
@@ -768,7 +776,8 @@ let translate program =
          | A.Leq     -> L.build_icmp L.Icmp.Sle
          | A.Greater -> L.build_icmp L.Icmp.Sgt
          | A.Geq     -> L.build_icmp L.Icmp.Sge
-         | A.Pow     ->  raise (InternalError "internal error: Power for int not supported yet")
+         | A.Pow     -> raise NotImplemented
+         | A.Matmul  ->  raise (InternalError "semant should have rejected illegal op on int")
         ) e1' e2' "_t" builder
 
       | SUnop(op, ((t, _) as e)) ->
@@ -882,7 +891,7 @@ let translate program =
         ignore(List.map (store_helper builder des) lst_ty);
         des
       | A.Mat -> L.build_store (L.const_pointer_null mat_t) des builder
-      | A.Img -> raise NotImplemented
+      | A.Img -> L.build_store (L.const_pointer_null img_t) des builder
       | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
     and gen_type_list l t n =

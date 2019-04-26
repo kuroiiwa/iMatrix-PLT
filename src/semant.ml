@@ -268,7 +268,7 @@ let check program =
           when same && (t1 = Int || t1 = Float) -> Bool
         | And | Or 
           when same && t1 = Bool -> Bool
-        | Add | Sub | Mult | Div 
+        | Add | Sub | Mult | Div | Matmul
           when same && t1 = Mat -> Mat
         | Add | Sub | Mult | Div 
           when same && t1 = Img -> Img
@@ -388,7 +388,6 @@ let check program =
       (Void,  "free_mat",     [Mat]);
       (Void,  "free_img",     [Img]);
       (Mat,   "matAssign",    [Mat; Float]);
-      (Mat,   "matMul",       [Mat; Mat]);
       (Img,   "imgAssign",    [Img; Int]);
       (Img,   "aveFilter",    [Img; Int]);
       (Img,   "edgeDetection",[Img; Int]);

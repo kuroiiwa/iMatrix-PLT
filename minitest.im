@@ -1,37 +1,13 @@
+int main() {
+	mat a(2,2);
+	mat b(2,2);
+	a = [[1.,2.], [3.,4.]];
+	b = [[5.,6.], [7.,8.]];
+	mat c = a .* b;
 
-struct test {
-	int a;
-};
-
-struct test test_f(struct test tmp) {
-	tmp.a = 2;
-	return tmp;
-}
-int main() {	
-	struct test me;
-	me.a = 1;
-
-	struct test notme;
-	notme = test_f(me);
-	print(me.a);
-	print(notme.a);
-
-	mat m1(2,4);
-//	m1 = [[1.,2.,3.,4.],[5.,6.,7.,8.]];
-	mat m2(4,3);
-	mat m3(2,3);
-	m3 = matMul(m1, m2);
-	img i1(10,8);
-
-	print(m3);
-	//print(i1);	
-
-	img i2(10,8);
-	aveFilter(i1, 2);
-	i2 = aveFilter(i1, 2);
-
-	img i3(10,8);
-	i3 = edgeDetection(i1, 3);
+	print(a);
+	print(b);
+	print(c);
 
 	return 0;
 	
