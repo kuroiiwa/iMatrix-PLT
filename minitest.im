@@ -1,9 +1,12 @@
 int main() {
-	mat a(2,2);
-	free_mat(a);
-	print(a);
+	img a;
+	a = readimg("./lib/puppy.jpg");
+	print(row(a));
 	print(col(a));
 
+	print(a[0][0][0]);
+	print(a[0][0][1]);
+	print(a[0][0][2]);
 	return 0;
 	
 }

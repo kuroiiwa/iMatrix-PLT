@@ -3,9 +3,13 @@ iMatrix, a language trying to make programming less painful for matrix and image
 
 ---
 ## Test
-Run ```make ``` to generate our compiler imatrix.  
-Run ```make ``` in lib directory to generate our buult-int library ```lib.a```.  
-For single test file, run ```./imatrix (file) > tmp.ll``` ```clang -o tmp.ll ./lib/lib.a```.  
+Install opencv lib: ```sudo apt install libopencv-dev``` (Linux environment).  
+Run ```make ``` to generate our compiler imatrix and library.  
+(Run ```make ``` in lib directory to generate our buult-int library ```lib.a``` separately.)  
+For single test file, run ```./imatrix (file) > tmp.ll```  
+```clang++ -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -o a.out tmp.ll ./lib/lib.a```.  
+(opencv lib in compilation flags.)  
+Or run ```trytest.sh``` to directly run minitest.im (make sure IR code is generated correctly)  
 For our tests files, run ```./ourtest.sh```.  
 
 ### Known bugs

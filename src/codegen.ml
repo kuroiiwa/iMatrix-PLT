@@ -202,6 +202,7 @@ let translate program =
       ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
       ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]);
       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
+      ("readimg",       A.Img,  img_t, [| string_t |]);
     ]
     in
     let add_builtit m (name, ty, return_ty, para_tylist) =
@@ -513,12 +514,12 @@ let translate program =
         | _ -> raise(InternalError("accessing wrong struct member"))
       in
       let p = L.build_in_bounds_gep des [|L.const_int i32_t 0 ; L.const_int i32_t pos|] "_t" builder in
-      let deref_ptr ptr (a,_) =
+      let deref_ptr des (a,_) =
         let offset = expr (local_vars, builder) a in
-        let des = L.build_load ptr "_t" builder in
         L.build_in_bounds_gep des [| offset |] "derefptr" builder
       in
       let isPtr = ref ptr in
+      let opt_final = L.build_load p "_t" builder in
       let final = match se2 with
         | (_,SId(s)) -> p
         | (slice_type ,SSlice(s,l)) -> (match slice_type with
@@ -526,17 +527,17 @@ let translate program =
                 let orig = L.build_load p "_t" builder in
                 ignore(isPtr := true);
                 copy_slice_opt orig l (local_vars, builder) true
-            | _ when L.type_of (L.build_load p "_t" builder) = mat_t ->
+            | _ when L.type_of opt_final = mat_t ->
               if !isPtr = true then p else
               let orig = L.build_load p "_t" builder in
               ignore(isPtr := true);
               copy_slice_opt orig l (local_vars, builder) true
-            | _ when L.type_of (L.build_load p "_t" builder) = img_t ->
+            | _ when L.type_of opt_final = img_t ->
               if !isPtr = true then p else
               let orig = L.build_load p "_t" builder in
               ignore(isPtr := true);
               copy_slice_opt orig l (local_vars, builder) true
-            | _ -> List.fold_left deref_ptr p l)
+            | _ -> List.fold_left deref_ptr opt_final l)
         | _ -> raise(InternalError("getmember error"))
       in
 
@@ -688,7 +689,7 @@ let translate program =
         let (t,_) = se2 in
         let dst = L.build_load des "_t" builder in
         (match ty,t,se2' with
-         | _,_,(_, SSlice(_, slice_l)) -> 
+         | _,_,(A.Array(_), SSlice(_, slice_l)) -> 
            set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
          | A.Mat,A.Array(_),_ ->
           let e' = expr (local_vars, builder) se2 in

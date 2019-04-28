@@ -1,8 +1,16 @@
-lib.a: built_in_lib.o
-	ar rcs lib.a built_in_lib.o
+CC = cc
+CPP = g++
+DLIBS = -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
+INCLUDE = -I/usr/include/opencv
 
-built_in_lib.o: built-in.c
-	cc -c built-in.c -o built_in_lib.o
+lib.a: built_in_lib.o opencv_lib.o
+	ar rcs lib.a built_in_lib.o opencv_lib.o
+
+opencv_lib.o: opencv_lib.cpp
+	$(CPP) -g -c opencv_lib.cpp -o opencv_lib.o
+
+built_in_lib.o: builtin.c
+	$(CC) -g -c -fopenmp builtin.c -o built_in_lib.o
 
 clean:
 	rm -f *.o *a
