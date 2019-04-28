@@ -23,7 +23,7 @@ let bind_dcl ty id e = match ty with
   | Mat -> raise(Failure("matrix and image should have initialization"))
   | _ -> (ty, id, e)
 
-let bind_arr_mat_img typ id (e1, e2) dim = 
+let bind_arr_mat_img typ id (e1, e2) dim =
   let rec gen_list l name (e1,e2) n =
     if n = 0 then l
     else gen_list (Call(name, [e1 ; e2]) :: l) name (e1,e2) (n-1)
@@ -83,7 +83,7 @@ decls:
  | decls fdecl_bodyless { Func_dcl($2) :: $1 }
  | decls struct_dcl {Struct_dcl($2) :: $1 }
 
- 
+
 struct_dcl:
   STRUCT ID LBRACE struct_list RBRACE SEMI
   {{
@@ -210,7 +210,7 @@ expr:
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
-  
+
 /*
 lamb_expr:
   | LPAREN lamb_ret_typ LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE RPAREN {  }
@@ -300,6 +300,6 @@ arr_ele:
   | MINUS arr_ele %prec NOT { Unop(Neg, $2)      }
   | NOT arr_ele         { Unop(Not, $2)          }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  } /* might need to be forbidden */
-  | LPAREN arr_ele RPAREN { $2                   }  
+  | LPAREN arr_ele RPAREN { $2                   }
 
 

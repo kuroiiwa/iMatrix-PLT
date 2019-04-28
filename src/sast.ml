@@ -80,7 +80,7 @@ let rec string_of_sexpr (t, e) =
 and
  string_of_s1dmat = function mat1d -> "[" ^ (String.concat ", " (List.map string_of_sexpr mat1d)) ^ "]" and
  string_of_s2dmat = function mat2d -> "[" ^ String.concat ", " (List.map string_of_s1dmat mat2d) ^ "]" and
- string_of_sarr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_s2dmat mat3d) ^ "]"   
+ string_of_sarr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_s2dmat mat3d) ^ "]"
 
 
 let string_of_svdecl (ty, id, e) = match e with
@@ -116,7 +116,7 @@ let string_of_sfdecl fdecl =
   String.concat "" (List.map string_of_sbody fdecl.sbody) ^
   "}\n"
 
-let string_of_sstruct sdecl = 
+let string_of_sstruct sdecl =
      "struct " ^ sdecl.sname ^ "{\n  " ^ String.concat "\n  " (List.map (fun (t,id) -> string_of_typ t ^ " " ^ id) sdecl.smember_list) ^
    "\n}\n"
 

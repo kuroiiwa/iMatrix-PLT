@@ -26,10 +26,10 @@ let check program =
     | Mat,Mat -> Mat
     | Img,Array(Array(Array(Int,a),b),c) when a > 0 && b > 0 && c > 0 -> Img
     | Img,Img -> Img
-    | Array(t, 0),Array(_) -> let actual_ty = get_type_arr rvaluet in 
+    | Array(t, 0),Array(_) -> let actual_ty = get_type_arr rvaluet in
       if actual_ty = t then rvaluet else raise (Failure err)
     | _,_ -> if lvaluet = rvaluet then lvaluet else raise (Failure err)
-  in 
+  in
 
 
   (* Return a variable from our current symbol table *)
@@ -48,7 +48,7 @@ let check program =
   in
 
   (* Return a function from our symbol table *)
-  let find_func map s = 
+  let find_func map s =
     try StringMap.find s map
     with Not_found -> raise (Failure ("unrecognized function " ^ s))
   in
@@ -80,8 +80,8 @@ let check program =
   in
 
   (* return to the original AST type based on checked slicing list *)
-  let slice_helper2 (var: ((int * (sexpr * sexpr)) list)) typ name = 
-    (* given input arr/mat/img and input slice, output the range (how many number we will get 
+  let slice_helper2 (var: ((int * (sexpr * sexpr)) list)) typ name =
+    (* given input arr/mat/img and input slice, output the range (how many number we will get
        after slicing and new slice (deal with -1)) *)
     let get_fst var = List.hd var in
     let get_snd var = List.hd (List.tl var) in
@@ -94,11 +94,11 @@ let check program =
 
     match typ with
     (* the input is a legal slice *)
-    | Mat -> (Mat, 
+    | Mat -> (Mat,
               SSlice(name, List.map (fun (a,b) -> b) var))
     | Img -> (Img,
               SSlice(name, List.map (fun (a,b) -> b) var))
-    | Array(cont,_) -> 
+    | Array(cont,_) ->
       (match cont with
        | Array(cont2,_) -> (match cont2 with
            |Array(_) -> (Array(Array(Array(catch_typ typ, fst (get_trd var)), fst (get_snd var)), fst (get_fst var)),
@@ -109,7 +109,7 @@ let check program =
   in
 
   (*   generate Int * (sexpr * sexpr) list *)
-  let slice_helper1 n range (a',b') = 
+  let slice_helper1 n range (a',b') =
     let (_, e1) = a' and (_, e2) = b' in
     match e1,e2 with
     | SId(_),SId(_) -> (1, (a', b'))
@@ -123,7 +123,7 @@ let check program =
   let rec slice_helper3 l = function
     (* get array dimension *)
     | Array(t, d) -> slice_helper3 (d :: l) t
-    | _ -> List.rev l 
+    | _ -> List.rev l
   in
 
   (* dereference array depth if possible *)
@@ -136,20 +136,20 @@ let check program =
   let check_equal (((_,a),(_,b)) as tuple) = match a,b with
     | SId(_),SId(_) -> tuple
     | SLiteral(a), SLiteral(b) when a = b -> tuple
-    | _ -> raise(Failure("illegal slicing for mat/img")) 
+    | _ -> raise(Failure("illegal slicing for mat/img"))
   in
 
   (* check slicing semantic *)
   let rec check_slice (vars, funcs) n l =
     let ty = type_of_identifier vars n in
-    let check_slice_expr (a,b) = 
+    let check_slice_expr (a,b) =
       let (t_a, e_a) as ex_a = check_expr (vars, funcs) a
       and (t_b, e_b) as ex_b = check_expr (vars, funcs) b in
       if t_a = Int && t_b = Int then (ex_a, ex_b)
       else raise(Failure("illegal slicing"))
     in
     match ty,(List.length l) with
-    | Mat,2 -> 
+    | Mat,2 ->
       let l' = List.map check_slice_expr l in
       ignore(List.map check_equal l');
       (Float, SSlice(n, l'))
@@ -172,7 +172,7 @@ let check program =
     let sarr3 = List.map (check_arr2 (v,f)) arr3 in
     check_list_type sarr3
 
-  and check_arr2 (v,f) arr2 = 
+  and check_arr2 (v,f) arr2 =
     let sarr2 = List.map (check_arr1 (v,f)) arr2 in
     check_list_type sarr2
 
@@ -189,13 +189,13 @@ let check program =
     in
     let validTuple (a,b) = a = b in
     match e2 with
-    | Id(s) when List.exists (fun (_,n) -> n = s) mem_list -> 
+    | Id(s) when List.exists (fun (_,n) -> n = s) mem_list ->
       let (ty, _) = List.find (fun (_,n) -> n = s) mem_list in
       (ty, SGetMember((lt,e1'), (ty,SId(s))) )
-    | Slice(s,l) when List.exists (fun (_,n) -> n = s) mem_list -> 
+    | Slice(s,l) when List.exists (fun (_,n) -> n = s) mem_list ->
       let (ty, name) = List.find (fun (_,n) -> n = s) mem_list in
       (match ty with
-       | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) -> 
+       | Struct(sn, sl) when List.length l = 1 && validTuple (List.hd l) ->
          let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
          (ty, SGetMember((lt,e1'), (rt, re)))
        | _ -> let (rt, re) = check_expr (StringMap.add name ty vars, funcs) e2 in
@@ -220,16 +220,16 @@ let check program =
     | Id s       -> (type_of_identifier var_symbols s, SId s)
     | GetMember(e1, e2) -> check_struct_access (var_symbols, func_symbols) e1 e2
     | Slice(n, l) -> check_slice (var_symbols,func_symbols) n l
-    | StructAssign(e1, e2) as ex -> 
+    | StructAssign(e1, e2) as ex ->
       let (lt, le) = check_expr (var_symbols, func_symbols) e1
       and (rt, e') = check_expr (var_symbols, func_symbols) e2 in
-      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
                 string_of_typ rt ^ " in " ^ string_of_expr ex
       in (check_assign lt rt err, SStructAssign((lt, le), (rt, e')))
-    | Assign(var, e) as ex -> 
+    | Assign(var, e) as ex ->
       let lt = type_of_identifier var_symbols var
       and (rt, e') = check_expr (var_symbols, func_symbols) e in
-      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
                 string_of_typ rt ^ " in " ^ string_of_expr ex
       in (check_assign lt rt err, SAssign(var, (rt, e')))
     | SliceAssign(var, lst, e) as ex ->
@@ -239,45 +239,45 @@ let check program =
           | SSlice(_, l) -> l
           | _ -> raise(Failure("internal error: slicing assign should be a valid slicing")))
       in
-      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
+      let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
                 string_of_typ rt ^ " in " ^ string_of_expr ex
       in (check_assign lt rt err, SSliceAssign(var, slice_list, (rt, re)))
-    | Unop(op, e) as ex -> 
+    | Unop(op, e) as ex ->
       let (t, e') = check_expr (var_symbols, func_symbols) e in
       let ty = match op with
           Neg when t = Int || t = Float -> t
         | Not when t = Bool -> Bool
-        | _ -> raise (Failure ("illegal unary operator " ^ 
+        | _ -> raise (Failure ("illegal unary operator " ^
                                string_of_uop op ^ string_of_typ t ^
                                " in " ^ string_of_expr ex))
       in (ty, SUnop(op, (t, e')))
-    | Binop(e1, op, e2) as e -> 
-      let (t1, e1') = check_expr (var_symbols, func_symbols) e1 
+    | Binop(e1, op, e2) as e ->
+      let (t1, e1') = check_expr (var_symbols, func_symbols) e1
       and (t2, e2') = check_expr (var_symbols, func_symbols) e2 in
       (* All binary operators require operands of the same type *)
       let same = t1 = t2 in
       (* Determine expression type based on operator and operand types *)
       let ty = match op with
-          Add | Sub | Mult | Div | Mod | Pow 
+          Add | Sub | Mult | Div | Mod | Pow
           when same && t1 = Int -> Int
-        | Add | Sub | Mult | Div | Pow 
+        | Add | Sub | Mult | Div | Pow
           when same && t1 = Float -> Float
-        | Equal | Neq            
+        | Equal | Neq
           when same -> Bool
         | Less | Leq | Greater | Geq
           when same && (t1 = Int || t1 = Float) -> Bool
-        | And | Or 
+        | And | Or
           when same && t1 = Bool -> Bool
         | Add | Sub | Mult | Div | Matmul
           when same && t1 = Mat -> Mat
-        | Add | Sub | Mult | Div 
+        | Add | Sub | Mult | Div
           when same && t1 = Img -> Img
         | _ -> raise (
             Failure ("illegal binary operator " ^
                      string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
       in (ty, SBinop((t1, e1'), op, (t2, e2')))
-    | Call("print", [e]) -> 
+    | Call("print", [e]) ->
       (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call("row", [e]) ->
       let e' = check_expr (var_symbols, func_symbols) e in
@@ -291,14 +291,14 @@ let check program =
       (match t with
         | Mat | Img -> (Int, SCall("col", [e']))
         | _ -> raise(Failure("col should have mat/img type")))
-    | Call(fname, args) as call -> 
+    | Call(fname, args) as call ->
       let fd = find_func func_symbols fname in
       let param_length = List.length fd.formals in
       if List.length args != param_length then
-        raise (Failure ("expecting " ^ string_of_int param_length ^ 
+        raise (Failure ("expecting " ^ string_of_int param_length ^
                         " arguments in " ^ string_of_expr call))
       else let check_call (ft, _, _) e =
-             let (et, e') = check_expr (var_symbols, func_symbols) e in 
+             let (et, e') = check_expr (var_symbols, func_symbols) e in
              let err = "illegal argument found " ^ string_of_typ et ^
                        " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
              in (check_assign ft et err, e')
@@ -363,14 +363,14 @@ let check program =
     | _,Noexpr -> (ty, n, (Void, SNoexpr))
     | _ ->
       let (rt, e') = check_expr (var_symbols, func_symbols) e in
-      let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^ 
+      let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^
                 string_of_typ rt ^ " in " ^ n ^ " = " ^ string_of_expr e
       in (check_assign ty rt err, n, (rt, e'))
   in
 
 
   (**** Collect all built-in functions at first ****)
-  let built_in_decls = 
+  let built_in_decls =
     let collect_formals l =
       let helper (n, lst) ty =
         (n+1, (ty, "x" ^ string_of_int n, Noexpr) :: lst)
@@ -379,7 +379,7 @@ let check program =
     in
     let add_bind map (fty, name, l) = StringMap.add name {
         typ = fty;
-        fname = name; 
+        fname = name;
         formals = collect_formals l;
         body = [] } map
     in List.fold_left add_bind StringMap.empty [
@@ -396,7 +396,7 @@ let check program =
   in
 
   (**** Add func to func_symbols with error handler ****)
-  let add_func (var_symbols, map) fd = 
+  let add_func (var_symbols, map) fd =
     let built_in_err = "function " ^ fd.fname ^ " may not be defined"
     and dup_err = "duplicate function " ^ fd.fname
     and make_err er = raise (Failure er)
@@ -408,10 +408,10 @@ let check program =
         | Struct(name,_) -> raise NotImplemented
         | _ -> fd.typ)
       | _ -> fd.typ)
-    in 
+    in
     let fixed_formals =
       let fix_formal (ty, tmp1, tmp2) = (match ty with
-        | Struct(name,_) -> 
+        | Struct(name,_) ->
           let new_ty = type_of_identifier var_symbols name in
           (new_ty, tmp1, tmp2)
         | Array(t,_) -> (match get_type_arr t with
@@ -425,15 +425,15 @@ let check program =
       fname = fd.fname;
       formals = fixed_formals;
       body = fd.body;
-    } 
+    }
     in
     let res = StringMap.mem n map
     in match fd_new with
       _ when StringMap.mem n built_in_decls -> make_err built_in_err
-    | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd_new map 
+    | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd_new map
     | _ when res && (let f = StringMap.find n map in (f.body <> [] && fd_new.body <> [])) -> make_err dup_err
     (*        | _ when StringMap.mem n map -> make_err dup_err   *)
-    | _ ->  StringMap.add n fd_new map 
+    | _ ->  StringMap.add n fd_new map
   in
 
   (* Check each function *)
@@ -443,10 +443,10 @@ let check program =
     check_binds_dup "local" (funct.formals @ body_dcl);
 
     (**** Check if a expr is bool type ****)
-    let check_bool_expr (var_symbols, func_symbols) e = 
+    let check_bool_expr (var_symbols, func_symbols) e =
       let (t', e') = check_expr (var_symbols, func_symbols) e
       and err = "expected Boolean expression in " ^ string_of_expr e
-      in if t' != Bool then raise (Failure err) else (t', e') 
+      in if t' != Bool then raise (Failure err) else (t', e')
     in
 
 
@@ -460,7 +460,7 @@ let check program =
              check_expr (var_symbols, func_symbols) e3, check_stmt (var_symbols, func_symbols) st)
       | While(p, s) -> SWhile(check_bool_expr (var_symbols, func_symbols) p, check_stmt (var_symbols, func_symbols) s)
       | Return e -> let (t, e') = check_expr (var_symbols, func_symbols) e in
-        if t = funct.typ then SReturn (t, e') 
+        if t = funct.typ then SReturn (t, e')
         else raise (
             Failure ("return gives " ^ string_of_typ t ^ " expected " ^
                      string_of_typ funct.typ ^ " in " ^ string_of_expr e))
@@ -527,9 +527,9 @@ let check program =
 
     let check_struct_local = (function
         | (Void, _) -> raise(Failure("void struct member in " ^ struct_dcl.name))
-        | (Struct(n,_) , nn) -> ignore(check_struct_scope var_symbols n); 
+        | (Struct(n,_) , nn) -> ignore(check_struct_scope var_symbols n);
           let ty = type_of_identifier var_symbols n in (ty,nn)
-        | (Array(orig,d) as arr, n) -> let ty = get_type_arr arr in 
+        | (Array(orig,d) as arr, n) -> let ty = get_type_arr arr in
           let arr_ty = (match ty with
               | Void -> raise(Failure("void struct member in " ^ struct_dcl.name))
               | Struct(name,_) -> ignore(check_struct_scope var_symbols name);
@@ -540,7 +540,7 @@ let check program =
         | (t, n) -> (t, n)
         (*        | (_, n) -> raise(Failure("illegal struct member definition at " ^ n ^ " in " ^ struct_dcl.name)) *))
     in
-    let lst = List.map check_struct_local struct_dcl.member_list in 
+    let lst = List.map check_struct_local struct_dcl.member_list in
     ((struct_dcl.name, lst),SStruct_dcl{
         sname = struct_dcl.name;
         smember_list = lst;
@@ -553,7 +553,7 @@ let check program =
       let (t,_,_) = dcl in
       ((StringMap.add id t var_symbols), func_symbols, SGlobaldcl(dcl) :: prog_sast)
     | Func(f) -> let new_func_symbols = add_func (var_symbols, func_symbols) f in
-      (var_symbols, new_func_symbols, 
+      (var_symbols, new_func_symbols,
         (check_function (var_symbols, new_func_symbols) (find_func new_func_symbols f.fname)) :: prog_sast)
     | Func_dcl(f) -> let new_func_symbols = add_func (var_symbols, func_symbols) f in
       (var_symbols, new_func_symbols, prog_sast)

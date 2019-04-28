@@ -18,7 +18,7 @@ rule token = parse
 | ';'      { SEMI }                     (* split *)
 | ','      { COMMA }
 | ':'      { COLON }
-| '.'      { DOT } 
+| '.'      { DOT }
 | '+'      { PLUS }                     (* arithmatic *)
 | '-'      { MINUS }
 | '*'      { TIMES }

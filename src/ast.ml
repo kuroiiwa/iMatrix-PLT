@@ -109,19 +109,19 @@ let rec string_of_expr = function
   | Id(s) -> s
   | GetMember(e1, e2) -> string_of_expr e1 ^ "." ^ string_of_expr e2
   | StructAssign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
-  | Binop(e1, o, e2) -> 
+  | Binop(e1, o, e2) ->
       string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
   | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_expr a ^ ":" ^ string_of_expr b ^ "]") lst)
     ^ " = " ^ string_of_expr e
-  | Call(f, el) -> 
+  | Call(f, el) ->
       f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Noexpr -> ""
 and
  string_of_1dmat = function mat1d -> "[" ^ String.concat ", " (List.map string_of_expr mat1d) ^ "]" and
  string_of_2dmat = function mat2d -> "[" ^ String.concat ", " (List.map string_of_1dmat mat2d) ^ "]" and
- string_of_arr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_2dmat mat3d) ^ "]" 
+ string_of_arr = function mat3d -> "[" ^ String.concat ", " (List.map string_of_2dmat mat3d) ^ "]"
 
 
 let rec string_of_dim str  = function
@@ -137,7 +137,7 @@ and string_of_typ = function
   | Void -> "void"
   | Mat -> "mat"
   | Img -> "img"
-  | Array(_, _) as arr -> string_of_dim "" arr 
+  | Array(_, _) as arr -> string_of_dim "" arr
   | Struct(n,_) -> "struct " ^ n
 
 and string_of_typ_debug = function
@@ -149,7 +149,7 @@ and string_of_typ_debug = function
   | Void -> "void"
   | Mat -> "mat"
   | Img -> "img"
-  | Array(_, _) as arr -> string_of_dim "" arr 
+  | Array(_, _) as arr -> string_of_dim "" arr
   | Struct(n,l) -> "struct " ^ n ^ "\n" ^ String.concat " " (List.map (fun (ty, str) -> string_of_typ_debug ty ^ " " ^ str) l) ^ "\n"
 
 let string_of_combind (t, id, expr) = match expr with
@@ -188,17 +188,17 @@ let string_of_fdecl fdecl =
   fdecl.fname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.formals) ^
   ")\n{\n" ^
   String.concat "" (List.map string_of_func_body fdecl.body) ^
-  "}\n" 
+  "}\n"
 
 let string_of_struct sdecl =
    "struct " ^ sdecl.name ^ "{\n  " ^ String.concat "\n  " (List.map (fun (t,id) -> string_of_typ t ^ " " ^ id) sdecl.member_list) ^
    "\n}\n"
 
-let string_of_program lst = 
+let string_of_program lst =
   let helper str = function
   | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
   | Func(f) -> str ^ string_of_fdecl f
   | Func_dcl(f) -> str ^ string_of_fdecl f
   | Struct_dcl(d) -> str ^ string_of_struct d
   in
-  List.fold_left helper "" lst 
+  List.fold_left helper "" lst
