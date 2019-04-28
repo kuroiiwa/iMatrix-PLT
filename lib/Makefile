@@ -1,7 +1,5 @@
 CC = cc
 CPP = g++
-DLIBS = -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
-INCLUDE = -I/usr/include/opencv
 
 lib.a: built_in_lib.o opencv_lib.o
 	ar rcs lib.a built_in_lib.o opencv_lib.o
