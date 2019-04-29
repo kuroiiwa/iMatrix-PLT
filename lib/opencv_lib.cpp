@@ -34,5 +34,8 @@ extern "C" void saveimg(char path[], struct img* image) {
 
 extern "C" void showimg(struct img* image) {
     Mat tmp(image->row, image->col, CV_8UC3, image->data);
+    cout << "call showimg" << endl;
+    namedWindow("Display", WINDOW_AUTOSIZE);
     imshow("Display", tmp);
+    waitKey(0);
 }
