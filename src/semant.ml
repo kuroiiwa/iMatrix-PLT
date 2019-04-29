@@ -392,6 +392,7 @@ let check program =
       (Img,   "aveFilter",    [Img; Int]);
       (Img,   "edgeDetection",[Img; Int]);
       (Img,   "readimg",      [String]);
+      (Void,  "saveimg",      [String; Img]);
       ]
   in
 

@@ -5,13 +5,14 @@ struct img {
 	int row;
 	int col;
 	/* channel num is 3 by default */
-	unsigned char*** data;
+	unsigned char* data;
+	/*rgb|rgb|rgb*/
 };
 
 struct mat {
 	int row;
 	int col;
-	double** data;
+	double* data;
 };
 
 struct img* malloc_img(int row, int col);

@@ -21,14 +21,14 @@ extern "C" struct img* readimg(char path[]) {
     Mat image = imread(path, CV_LOAD_IMAGE_COLOR);
     struct img *res = malloc_img(image.rows, image.cols);
 
-    for (int i = 0; i < image.rows; i++) {
-        const uchar* cur = image.ptr<uchar>(i);
-
-        for (int j = 0; j < image.cols; j++) {
-            for (int k = 0; k < 3; k++)
-                res->data[i][j][k] = cur[3*j + k];
-        }
-    }
+    // copy whole image
+    memcpy(res->data, image.data, image.rows * image.cols * 3);
 
     return res;
 }
+
+extern "C" void saveimg(char path[], struct img* image) {
+    Mat tmp(image->row, image->col, CV_8UC3, image->data);
+    imwrite(path, tmp);
+}
+

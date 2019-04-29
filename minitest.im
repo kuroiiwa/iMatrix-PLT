@@ -4,9 +4,8 @@ int main() {
 	print(row(a));
 	print(col(a));
 
-	print(a[0][0][0]);
-	print(a[0][0][1]);
-	print(a[0][0][2]);
+	img b = edgeDetection(a, 10);
+	saveimg("./lib/test.jpg",b);
 	return 0;
-	
+
 }
