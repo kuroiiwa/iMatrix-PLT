@@ -32,3 +32,7 @@ extern "C" void saveimg(char path[], struct img* image) {
     imwrite(path, tmp);
 }
 
+extern "C" void showimg(struct img* image) {
+    Mat tmp(image->row, image->col, CV_8UC3, image->data);
+    imshow("Display", tmp);
+}

@@ -204,6 +204,7 @@ let translate program =
       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
+      ("showimg",       A.Void, i32_t, [| img_t |]);
     ]
     in
     let add_builtit m (name, ty, return_ty, para_tylist) =

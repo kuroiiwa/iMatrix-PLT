@@ -5,7 +5,6 @@ open Ast
 
 let bind_arr_dcl_noexpr t id dim = match t,dim with
   | _,(0,0,0) -> raise(Failure("array declartion without initialization should have specific dimension"))
-  | Mat,_ | Img,_ -> raise(Failure("matrix and image should have initialization"))
   | t,(0,0,a) when a > 0 -> (Array(t,a), id, Noexpr)
   | t,(0,a,b) when a > 0 && b > 0 -> (Array(Array(t,b),a), id, Noexpr)
   | t,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, Noexpr)
@@ -19,9 +18,7 @@ let bind_arr_dcl_expr t id dim e = match t,dim with
   | _,(a,b,c) when a > 0 && b > 0 && c > 0 -> (Array(Array(Array(t,c),b),a), id, e)
   | _ -> raise(Failure("dimension error"))
 
-let bind_dcl ty id e = match ty with
-  | Mat -> raise(Failure("matrix and image should have initialization"))
-  | _ -> (ty, id, e)
+let bind_dcl ty id e = (ty, id, e)
 
 let bind_arr_mat_img typ id (e1, e2) dim =
   let rec gen_list l name (e1,e2) n =

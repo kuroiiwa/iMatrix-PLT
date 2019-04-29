@@ -393,6 +393,7 @@ let check program =
       (Img,   "edgeDetection",[Img; Int]);
       (Img,   "readimg",      [String]);
       (Void,  "saveimg",      [String; Img]);
+      (Void,  "showimg",      [Img]);
       ]
   in
 
