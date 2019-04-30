@@ -67,7 +67,7 @@ type prog_element = Globaldcl of bind
                   | Func_dcl of func_decl
                   | Struct_dcl of struct_decl
 
-type program = prog_element list
+type program = string list * prog_element list
 
 
 

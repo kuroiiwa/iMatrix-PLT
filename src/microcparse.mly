@@ -39,7 +39,7 @@ let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 %}
 
 
-%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
+%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE INCLUDE
 %token SEMI COMMA DOT COLON
 %token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS MATMUL
 %token ASSIGN
@@ -73,7 +73,12 @@ let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 %%
 
 program:
-  decls EOF { List.rev $1 }
+  includes decls EOF { (List.rev $1, List.rev $2) }
+
+includes:
+ | /* nothing */ { []   }
+ | INCLUDE STRLIT       { [$2] }
+ | includes INCLUDE STRLIT { $3 :: $1 }
 
 decls:
    /* nothing */ { []              }

@@ -18,8 +18,16 @@ let () =
   let channel = ref stdin in
   Arg.parse speclist (fun filename -> channel := open_in filename) usage_msg;
 
-  let lexbuf = Lexing.from_channel !channel in
-  let ast = Microcparse.program Scanner.token lexbuf in
+  let rec parse_ast file =
+    let lexbuf = Lexing.from_channel file in
+    let (files, ast_main) = Microcparse.program Scanner.token lexbuf in
+      let parse_file l fn =
+         let buf = open_in fn in
+         l @ parse_ast buf in
+      let include_asts = List.fold_left parse_file [] files in
+    include_asts @ ast_main
+  in
+  let ast = parse_ast !channel in
   match !action with
     Ast -> print_string (Ast.string_of_program ast)
   | _ -> let sast = Semant.check ast in

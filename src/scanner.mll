@@ -9,6 +9,7 @@ rule token = parse
   [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
 | "/*"     { comment lexbuf }           (* Comments *)
 | "//"     { inlinecom lexbuf }
+| "include" { INCLUDE }
 | '('      { LPAREN }                   (* () [] {} *)
 | ')'      { RPAREN }
 | '['      { LBRACK }
