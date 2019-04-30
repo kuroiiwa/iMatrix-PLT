@@ -1,11 +1,60 @@
+
+img aveFilter(img imgIn, int fWidth) {
+	/*
+	Input a imgIn(row, col, layer), implement average filter of
+	 a radius of fWidth. The output is imgOut.
+
+	e.g. filter width = 1, then we use 3 x 3 filter
+	     filter width = 2, then we use 5 x 5 filter
+	*/
+
+	int row = row(imgIn);
+	int col = col(imgIn);
+	int layer = 3;
+
+	img imgOut(row, col);
+
+	int i;
+	int j;
+	int k;
+	int count;
+	int sum;
+	int m;
+	int n;
+	int ii;
+	int jj;
+	int aveResult;
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			for (k = 0; k < layer; ++k) {
+				// for each pixel in each channel, do average
+				count = 0;
+				sum = 0;
+				for (m = -fWidth; m <= fWidth; ++m) {
+					for (n = -fWidth; n <= fWidth; ++n) {
+						if (i + m >= 0 && i + m < row - 1
+							&& j + n >= 0 && j + n < col - 1) {
+							++count;
+							ii = i + m;
+							jj = j + n;
+							sum = sum + imgIn[ii][jj][k];
+						}
+					}
+				}
+				aveResult = sum / count;
+				imgOut[i][j][k] = aveResult;
+			}
+		}
+	}
+
+	return imgOut;
+}
+
 int main() {
-	img a;
-	a = readimg("./lib/puppy.jpg");
-	print(row(a));
-	print(col(a));
+	img a = readimg("./lib/puppy.jpg");
 
-	img b = edgeDetection(a, 10);
-	saveimg("./lib/test.jpg",b);
+	img b = aveFilter(a, 10);
+	saveimg("./lib/test.jpg", b);
+
 	return 0;
-
 }

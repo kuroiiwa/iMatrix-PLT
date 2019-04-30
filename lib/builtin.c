@@ -44,7 +44,7 @@ float __returnMatVal(struct mat* a, int r, int c) {
 	return a->data[a->col * r + c];
 }
 
-int __returnImgVal(struct img* a, int ch, int r, int c) {
+int __returnImgVal(struct img* a, int r, int c, int ch) {
 	assert(a != NULL);
 	assert(r >= 0 && c >= 0 && ch >= 0);
 	assert(r < a->row && c < a->col && ch < 3);
@@ -58,7 +58,7 @@ void __setMatVal(double val, struct mat* a, int r, int c) {
 	a->data[a->col * r + c] = val;
 }
 
-void __setImgVal(int val, struct img* a, int ch, int r, int c) {
+void __setImgVal(int val, struct img* a, int r, int c, int ch) {
 	assert(a != NULL);
 	assert(r >= 0 && c >= 0 && ch >= 0);
 	assert(r < a->row && c < a->col && ch < 3);
@@ -468,43 +468,43 @@ struct img* __imgOperator(struct img* m1, struct img* m2, char op) {
 	return m3;
 }
 
-struct img* aveFilter(struct img* imgIn, int fWidth) {
-	/*
-	Input a imgIn(row, col, layer), implement average filter of
-	 a radius of fWidth. The output is imgOut.
+// struct img* aveFilter(struct img* imgIn, int fWidth) {
+// 	/*
+// 	Input a imgIn(row, col, layer), implement average filter of
+// 	 a radius of fWidth. The output is imgOut.
 
-	e.g. filter width = 1, then we use 3 x 3 filter
-	     filter width = 2, then we use 5 x 5 filter
-	*/
+// 	e.g. filter width = 1, then we use 3 x 3 filter
+// 	     filter width = 2, then we use 5 x 5 filter
+// 	*/
 
-	const int row = imgIn -> row;
-	const int col = imgIn -> col;
-	const int layer = 3;
+// 	const int row = imgIn -> row;
+// 	const int col = imgIn -> col;
+// 	const int layer = 3;
 
-	struct img* imgOut = malloc_img(row, col);
+// 	struct img* imgOut = malloc_img(row, col);
 
-	for (int i = 0; i < row; i++) {
-		for (int j = 0; j < col; j++) {
-			for (int k = 0; k < layer; k++) {
-				/* for each pixel in each channel, do average */
-				int count = 0;
-				int sum = 0;
-				for (int m = -fWidth; m <= fWidth; m++) {
-					for (int n = -fWidth; n <= fWidth; n++) {
-						if (i + m >= 0 && i + m < row - 1
-							&& j + n >= 0 && j + n < col - 1) {
-							count++;
-							sum += accImg(imgIn, (i+m), (j+n), k);
-						}
-					}
-				}
-				int aveResult = sum / count;
-				accImg(imgOut, i, j, k) = aveResult;
-			}
-		}
-	}
-	return imgOut;
-}
+// 	for (int i = 0; i < row; i++) {
+// 		for (int j = 0; j < col; j++) {
+// 			for (int k = 0; k < layer; k++) {
+// 				/* for each pixel in each channel, do average */
+// 				int count = 0;
+// 				int sum = 0;
+// 				for (int m = -fWidth; m <= fWidth; m++) {
+// 					for (int n = -fWidth; n <= fWidth; n++) {
+// 						if (i + m >= 0 && i + m < row - 1
+// 							&& j + n >= 0 && j + n < col - 1) {
+// 							count++;
+// 							sum += accImg(imgIn, (i+m), (j+n), k);
+// 						}
+// 					}
+// 				}
+// 				int aveResult = sum / count;
+// 				accImg(imgOut, i, j, k) = aveResult;
+// 			}
+// 		}
+// 	}
+// 	return imgOut;
+// }
 
 struct img* edgeDetection(struct img* imgIn, int threshold) {
 	//use 3 x 3 filter for edge detection

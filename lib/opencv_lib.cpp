@@ -28,6 +28,7 @@ extern "C" struct img* readimg(char path[]) {
 }
 
 extern "C" void saveimg(char path[], struct img* image) {
+    assert(image != NULL);
     Mat tmp(image->row, image->col, CV_8UC3, image->data);
     imwrite(path, tmp);
 }
