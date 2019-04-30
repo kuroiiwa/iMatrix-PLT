@@ -34,6 +34,8 @@ let bind_mat_img typ id (e1, e2) = match typ with
   | Img -> (Img, id, Call("malloc_img", [e1 ; e2]))
   | _ -> raise(Failure("struct does not have initialization"))
 
+let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
+
 %}
 
 
@@ -132,10 +134,19 @@ typ:
   | IMG   { Img }
   | STRUCT ID { Struct($2, []) }
 
+id_list:
+  | ID { [$1] }
+  | id_list COMMA ID { $3 :: $1 }
+
 func_body_list:
     /* nothing */ { [] }
   | func_body_list stmt  { Stmt($2) :: $1 }
   | func_body_list vdecl { Dcl($2) :: $1 }
+  | func_body_list typ id_list SEMI { (bind_list $2 $3) @ $1 }
+
+stmt_list:
+  | /* nothing */ { [] }
+  | stmt_list stmt { Stmt($2) :: $1 }
 
 vdecl:
     typ ID SEMI { bind_dcl $1 $2 Noexpr }
@@ -158,7 +169,7 @@ dimension:
 stmt:
     expr SEMI                               { Expr $1               }
   | RETURN expr_opt SEMI                    { Return $2             }
-  | LBRACE func_body_list RBRACE                 { Block(List.rev $2)    }
+  | LBRACE stmt_list RBRACE                 { Block(List.rev $2)    }
   | IF LPAREN expr RPAREN stmt %prec NOELSE { If($3, $5, Block([])) }
   | IF LPAREN expr RPAREN stmt ELSE stmt    { If($3, $5, $7)        }
   | FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN stmt
