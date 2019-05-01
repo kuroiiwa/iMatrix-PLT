@@ -198,9 +198,10 @@ let translate program =
       ("malloc_img",    A.Img,  img_t, [| i32_t; i32_t |]);
       ("free_mat",      A.Void, i32_t, [| mat_t |]);
       ("free_img",      A.Void, i32_t, [| img_t |]);
+      ("repMat",         A.Mat,  mat_t, [| float_t; i32_t; i32_t|]);
       ("matAssign",     A.Mat,  mat_t, [| mat_t; float_t |]);
       ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
-      ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]);
+(*       ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]); *)
       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
@@ -319,7 +320,8 @@ let translate program =
     | A.Struct(_, l) ->
       let lst_sexpr = List.map (fun (ty, id) -> ty) l in
       L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
-    | A.Mat | A.Img -> raise(InternalError("mat and img should have malloc init"))
+    | A.Mat -> L.const_pointer_null mat_t
+    | A.Img -> L.const_pointer_null img_t
     | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
   and generate_type_list l t n =
@@ -697,7 +699,11 @@ let translate program =
           let e' = expr (local_vars, builder) se2 in
           let ar = extDim t in
           L.build_call (builtin_f "__setMat") [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+         | _,A.Float,(_, SSlice(_, slice_l)) when L.type_of dst = mat_t ->
+           set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
          | A.Img,A.Array(_),_ -> raise NotImplemented
+         | _,A.Int,(_, SSlice(_, slice_l)) when L.type_of dst = img_t ->
+           set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
          | _ -> let e' = expr (local_vars, builder) se2 in
            ignore(L.build_store e' des builder); e')
 

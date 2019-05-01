@@ -7,7 +7,7 @@
 #define accImg(img,i,j,k) (img->data[3 * ((i) * img->col + (j)) + (k)])
 
 
-void __printMat(struct mat* a) {
+void __printMat(const struct mat* a) {
 	assert(a != NULL && "try to print empty matrix");
 	assert(a->row > 0 && a->col > 0);
 	printf("\nrow: %d col: %d \n", a->row, a->col);
@@ -19,7 +19,7 @@ void __printMat(struct mat* a) {
 	}
 }
 
-void __printImg(struct img* a) {
+void __printImg(const struct img* a) {
 	assert(a != NULL);
 	printf("\nrow: %d col: %d \n", a->row, a->col);
 	// for (int k = 0; k < 3; k++) {
@@ -32,19 +32,19 @@ void __printImg(struct img* a) {
 	// }
 }
 
-int __matRow(struct mat* a) { assert(a != NULL); return a->row; }
-int __matCol(struct mat* a) { assert(a != NULL); return a->col; }
-int __imgRow(struct img* a) { assert(a != NULL); return a->row; }
-int __imgCol(struct img* a) { assert(a != NULL); return a->col; }
+int __matRow(const struct mat* a) { assert(a != NULL); return a->row; }
+int __matCol(const struct mat* a) { assert(a != NULL); return a->col; }
+int __imgRow(const struct img* a) { assert(a != NULL); return a->row; }
+int __imgCol(const struct img* a) { assert(a != NULL); return a->col; }
 
-float __returnMatVal(struct mat* a, int r, int c) {
+float __returnMatVal(const struct mat* a, int r, int c) {
 	assert(a != NULL);
 	assert(r >= 0 && c >= 0);
 	assert(r < a->row && c < a->col);
 	return a->data[a->col * r + c];
 }
 
-int __returnImgVal(struct img* a, int r, int c, int ch) {
+int __returnImgVal(const struct img* a, int r, int c, int ch) {
 	assert(a != NULL);
 	assert(r >= 0 && c >= 0 && ch >= 0);
 	assert(r < a->row && c < a->col && ch < 3);
@@ -381,7 +381,7 @@ void __printCharArr(char*** start, int row, int col, int layer) {
 }
 
 
-struct mat* __matMul(struct mat* m1, struct mat* m2) {
+struct mat* __matMul(const struct mat* m1, const struct mat* m2) {
 	/*
 	please make sure the dimension is correct before input parameters
 	A(dim1, dim2) and B(dim2, dim3) are input matrices,
@@ -406,6 +406,14 @@ struct mat* __matMul(struct mat* m1, struct mat* m2) {
 	return m3;
 }
 
+struct mat* repMat(double val, int row, int col) {
+	assert(row > 0 && col > 0);
+	struct mat* m = malloc_mat(row, col);
+	for (int i = 0; i < row * col; i++)
+		m->data[i] = val;
+	return m;
+}
+
 struct mat* matAssign(struct mat* m, double val) {
 	for (int i = 0; i < m->row; ++i)
 		for (int j = 0; j < m->col; ++j)
@@ -413,7 +421,7 @@ struct mat* matAssign(struct mat* m, double val) {
 	return m;
 }
 
-struct mat* __matOperator(struct mat* m1, struct mat* m2, char op) {
+struct mat* __matOperator(const struct mat* m1, const struct mat* m2, char op) {
 	assert(m1 != NULL && m2 != NULL);
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
@@ -445,7 +453,7 @@ struct img* imgAssign(struct img* m, int val) {
 	return m;
 }
 
-struct img* __imgOperator(struct img* m1, struct img* m2, char op) {
+struct img* __imgOperator(const struct img* m1, const struct img* m2, char op) {
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
 	int r = m1->row, c = m1->col;
