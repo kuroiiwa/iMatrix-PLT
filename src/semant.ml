@@ -390,7 +390,7 @@ let check program =
       (Mat,   "matAssign",    [Mat; Float]);
       (Img,   "imgAssign",    [Img; Int]);
 (*       (Img,   "aveFilter",    [Img; Int]); *)
-      (Img,   "edgeDetection",[Img; Int]);
+      (* (Img,   "edgeDetection",[Img; Int]); *)
       (Img,   "readimg",      [String]);
       (Void,  "saveimg",      [String; Img]);
       (Void,  "showimg",      [Img]);

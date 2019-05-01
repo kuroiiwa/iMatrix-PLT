@@ -1,3 +1,35 @@
+int abs(int input) {
+	int result;
+
+	if (input >= 255) 
+		input = 255;
+	if (input <= -255)
+		input = -255;
+
+	if (input >= 0) {
+		result = input;
+	}
+	else
+		result = -input;
+
+	return result;
+}
+
+int relu(int input) {
+	int result;
+
+	if (input >= 255) 
+		input = 255;
+	if (input <= -255)
+		input = -255;
+		
+	if (input >= 0)
+		result = input;
+	else
+		result = 0;
+
+	return result;
+}
 
 img aveFilter(img imgIn, int fWidth) {
 	/*
@@ -7,7 +39,6 @@ img aveFilter(img imgIn, int fWidth) {
 	e.g. filter width = 1, then we use 3 x 3 filter
 	     filter width = 2, then we use 5 x 5 filter
 	*/
-
 	int row = row(imgIn);
 	int col = col(imgIn);
 	int layer = 3;
@@ -19,7 +50,7 @@ img aveFilter(img imgIn, int fWidth) {
 	for (i = 0; i < row; ++i) {
 		for (j = 0; j < col; ++j) {
 			for (k = 0; k < layer; ++k) {
-				/* for each pixel in each channel, do average */
+				// for each pixel in each channel, do average 
 				count = 0;
 				sum = 0;
 				for (m = -fWidth; m <= fWidth; ++m) {
@@ -38,5 +69,205 @@ img aveFilter(img imgIn, int fWidth) {
 			}
 		}
 	}
+	return imgOut;
+}
+
+img edgeDetection(img imgIn, int threshold) {
+	//use 3 x 3 filter for edge detection
+	int row = row(imgIn);
+	int col = col(imgIn);
+	int layer = 3;
+
+	img imgOut(row, col);
+	int i, j, k, i_n1, i_p1, j_n1, j_p1;
+	int gradSumTemp, gradSum;
+	for (i = 0; i < row; ++i) { 
+		for (j = 0; j < col; ++j) { 
+
+			// for the edge of the input image, we simply ignore them
+			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
+				for (k = 0; k < layer; ++k)
+					imgOut[i][j][k] = 0;
+			} 
+			// else, we compute the gradients and judge if it is edge
+			else {
+				gradSum = 0; // total gradients
+
+				for (k = 0; k < layer; ++k) {
+					i_n1 = i - 1;
+					i_p1 = i + 1;
+					j_n1 = j - 1;
+					j_p1 = j + 1;
+					gradSumTemp = 8 * imgIn[i][j][k]
+							- imgIn[ i_n1][j_n1][k] - imgIn[ i_n1][j][k]  - imgIn[ i_n1][j_p1][k]
+							- imgIn[ i][j_n1][k] - imgIn[ i][j_p1][k]
+							- imgIn[ i_p1][j_n1][k] - imgIn[ i_p1][j][k] - imgIn[ i_p1][j_p1][k];
+					if (gradSumTemp < 0)
+						// abs
+						gradSumTemp = - gradSumTemp;
+					gradSum = gradSum + gradSumTemp;
+				}
+
+				gradSum = gradSum / layer;
+				if (gradSum >= threshold) {
+					for (k = 0; k < layer; ++k)
+						imgOut[i][j][k] = imgIn[i][j][k];
+				}
+				else {
+					for (k = 0; k < layer; ++k)
+						imgOut[i][j][k] = 0;
+				}
+			}
+		}
+	}
+	return imgOut;
+} 
+
+
+img RBG_regularization(img imgIn) {
+	// regularize 3 channels to increase the contrast of the image 
+
+	int row = row(imgIn);
+	int col = col(imgIn);
+	int layer = 3;
+
+	img imgOut(row, col);
+
+	// compute RBG sum
+	int r_sum = 0;
+	int b_sum = 0;
+	int g_sum = 0;
+	int pixel_count = 0;
+
+	int i, j, k;
+
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			r_sum = r_sum + imgIn[i][j][0];
+			g_sum = g_sum + imgIn[i][j][1];
+			b_sum = b_sum + imgIn[i][j][2];
+			pixel_count = pixel_count + 1;
+		}
+	}
+
+	// compute delta
+	int all_sum = r_sum + g_sum + b_sum;
+	int r_ave = r_sum / pixel_count;
+	int g_ave = g_sum / pixel_count;
+	int b_ave = b_sum / pixel_count;
+	int all_ave = all_sum / pixel_count / 3;
+
+	int delta_r = r_ave - all_ave;
+	int delta_g = g_ave - all_ave;
+	int delta_b = b_ave - all_ave;
+
+	// write to imgOut
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			imgOut[i][j][0] = relu(imgIn[i][j][0] - delta_r);
+			imgOut[i][j][1] = relu(imgIn[i][j][1] - delta_r);
+			imgOut[i][j][2] = relu(imgIn[i][j][2] - delta_r);
+		}
+	}
+
+	return imgOut;
+}
+
+
+img threshold_filter_separate(img imgIn, int r_threshold, int g_threshold, int b_threshold, string option) {
+	// filter 3 channels of the image , we filter 3 channels seperately,
+	// options are "greater" and "less" (than threshold) 
+
+	int row = row(imgIn);
+	int col = col(imgIn);
+	int layer = 3;
+
+	img imgOut(row, col);
+
+	int i, j, k;
+
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			if (option == "greater") {
+				if (imgIn[i][j][0] > r_threshold) 
+					imgOut[i][j][0] = imgIn[i][j][0];
+				else
+					imgOut[i][j][0] = 0;
+				if (imgIn[i][j][1] > g_threshold) 
+					imgOut[i][j][1] = imgIn[i][j][1];
+				else
+					imgOut[i][j][1] = 0;
+				if (imgIn[i][j][2] > b_threshold) 
+					imgOut[i][j][2] = imgIn[i][j][2];
+				else
+					imgOut[i][j][2] = 0;
+			}
+			if (option == "less") {
+				if (imgIn[i][j][0] < r_threshold) 
+					imgOut[i][j][0] = imgIn[i][j][0];
+				else
+					imgOut[i][j][0] = 0;
+				if (imgIn[i][j][1] < g_threshold) 
+					imgOut[i][j][1] = imgIn[i][j][1];
+				else
+					imgOut[i][j][1] = 0;
+				if (imgIn[i][j][2] < b_threshold) 
+					imgOut[i][j][2] = imgIn[i][j][2];
+				else
+					imgOut[i][j][2] = 0;
+			}
+		}
+	}
+
+	return imgOut;
+}
+
+img threshold_filter_together(img imgIn, int threshold, string option) {
+	// filter 3 channels together, i.e. either keep all 3 channels or throw all of them,
+	// options are "greater" and "less" (than threshold) 
+
+		int row = row(imgIn);
+	int col = col(imgIn);
+	int layer = 3;
+
+	img imgOut(row, col);
+
+	int i, j, k;
+	int channel_sum, channel_ave;
+
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+
+			channel_sum = imgIn[i][j][0] + imgIn[i][j][1] + imgIn[i][j][2];
+			channel_ave = channel_sum / 3;
+
+			if (option == "greater") {
+				if (channel_ave > threshold) {
+					imgOut[i][j][0] = imgIn[i][j][0];
+					imgOut[i][j][1] = imgIn[i][j][1];
+					imgOut[i][j][2] = imgIn[i][j][2];
+				}
+				else {
+					imgOut[i][j][0] = 0;
+					imgOut[i][j][1] = 0;
+					imgOut[i][j][2] = 0;
+				}
+			}
+
+			if (option == "less") {
+				if (channel_ave < threshold) {
+					imgOut[i][j][0] = imgIn[i][j][0];
+					imgOut[i][j][1] = imgIn[i][j][1];
+					imgOut[i][j][2] = imgIn[i][j][2];
+				}
+				else {
+					imgOut[i][j][0] = 0;
+					imgOut[i][j][1] = 0;
+					imgOut[i][j][2] = 0;
+				}
+			}
+		}
+	}
+
 	return imgOut;
 }
