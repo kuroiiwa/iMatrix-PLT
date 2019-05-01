@@ -4,6 +4,14 @@ include "./lib/imlib.im"
 int main() {
 	img a = readimg("./lib/puppy.jpg");
 
+	// ave filter
+	img aveFilter = aveFilter(a, 10);
+	saveimg("./generated_images/aveFilter.jpg", aveFilter);
+
+	// edgeDetection
+	img edgeDetection = edgeDetection(a, 30);
+	saveimg("./generated_images/edgeDetection.jpg", edgeDetection);
+	
 	/*
 	// filter 3 channels separately
 	img threshold_filter_separate_greater = threshold_filter_separate(a, 120, 120, 120, "greater");
@@ -16,10 +24,12 @@ int main() {
 	img threshold_filter_together_less = threshold_filter_together(a, 120, "less");
 	saveimg("./generated_images/threshold_filter_together_greater.jpg", threshold_filter_together_greater);
 	saveimg("./generated_images/threshold_filter_together_less.jpg", threshold_filter_together_less);
-	*/
 
+	// regularization
 	img RBG_regularization = RBG_regularization(a);
 	saveimg("./generated_images/RBG_regularization.jpg", RBG_regularization);
-	
+	*/
+
+
 	return 0;
 }
