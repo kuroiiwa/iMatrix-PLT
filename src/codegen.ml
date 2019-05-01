@@ -894,12 +894,27 @@ let translate program =
           L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "_t" builder
         in
 
+        let norm_type = (function
+          | A.Img | A.Mat | A.Array(_) | A.Struct(_) -> false
+          | _ -> true)
+        in
+        if norm_type arr_ty then begin
+          let arrval = List.map type_zeroinitializer (gen_type_list [] arr_ty num) in
+          let arr = L.const_array (ltype_of_typ arr_ty) (Array.of_list arrval) in
+          let tmp = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "_t" builder in
+          ignore(L.build_store arr tmp builder);
+          let ptr = L.build_bitcast tmp (ltype_of_typ t) "_t" builder in
+          L.build_store ptr des builder
+        end
+        else begin
+
         let ty_l = gen_type_list [] arr_ty num in
         let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder in
         let ptr = L.build_bitcast spc (ltype_of_typ t) "_t" builder in
 
         ignore(List.fold_left (store_helper builder) ptr ty_l);
         L.build_store ptr des builder
+        end
 
       | A.Struct(_, l) ->
         let store_helper builder des (t,n) =
