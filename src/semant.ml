@@ -135,7 +135,7 @@ let check program =
   (* mat and img only support single element slicing *)
   let check_equal (((_,a),(_,b)) as tuple) = match a,b with
     | SId(_),SId(_) -> tuple
-    | SLiteral(a), SLiteral(b) when a = b -> tuple
+    | SLiteral(a), SLiteral(b) when a = b && a >= 0 -> tuple
     | _ -> raise(Failure("illegal slicing for mat/img"))
   in
 
@@ -387,6 +387,7 @@ let check program =
       (Img,   "malloc_img",   [Int; Int]);
       (Void,  "free_mat",     [Mat]);
       (Void,  "free_img",     [Img]);
+      (Mat,   "repMat",       [Float; Int; Int]);
       (Mat,   "matAssign",    [Mat; Float]);
       (Img,   "imgAssign",    [Img; Int]);
 (*       (Img,   "aveFilter",    [Img; Int]); *)

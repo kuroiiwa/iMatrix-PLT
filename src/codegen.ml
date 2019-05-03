@@ -198,9 +198,10 @@ let translate program =
       ("malloc_img",    A.Img,  img_t, [| i32_t; i32_t |]);
       ("free_mat",      A.Void, i32_t, [| mat_t |]);
       ("free_img",      A.Void, i32_t, [| img_t |]);
+      ("repMat",         A.Mat,  mat_t, [| float_t; i32_t; i32_t|]);
       ("matAssign",     A.Mat,  mat_t, [| mat_t; float_t |]);
       ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
-      ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]);
+(*       ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]); *)
       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]);
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
@@ -319,7 +320,8 @@ let translate program =
     | A.Struct(_, l) ->
       let lst_sexpr = List.map (fun (ty, id) -> ty) l in
       L.const_named_struct (ltype_of_typ t) (Array.of_list (List.map type_zeroinitializer lst_sexpr))
-    | A.Mat | A.Img -> raise(InternalError("mat and img should have malloc init"))
+    | A.Mat -> L.const_pointer_null mat_t
+    | A.Img -> L.const_pointer_null img_t
     | _ -> raise(InternalError("type can not be initialized: " ^ A.string_of_typ t))
 
   and generate_type_list l t n =
@@ -697,7 +699,11 @@ let translate program =
           let e' = expr (local_vars, builder) se2 in
           let ar = extDim t in
           L.build_call (builtin_f "__setMat") [| dst; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
+         | _,A.Float,(_, SSlice(_, slice_l)) when L.type_of dst = mat_t ->
+           set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
          | A.Img,A.Array(_),_ -> raise NotImplemented
+         | _,A.Int,(_, SSlice(_, slice_l)) when L.type_of dst = img_t ->
+           set_slice_opt (local_vars, builder) (dst, slice_l, se2) ty
          | _ -> let e' = expr (local_vars, builder) se2 in
            ignore(L.build_store e' des builder); e')
 
@@ -894,12 +900,27 @@ let translate program =
           L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "_t" builder
         in
 
+        let norm_type = (function
+          | A.Img | A.Mat | A.Array(_) | A.Struct(_) -> false
+          | _ -> true)
+        in
+        if norm_type arr_ty then begin
+          let arrval = List.map type_zeroinitializer (gen_type_list [] arr_ty num) in
+          let arr = L.const_array (ltype_of_typ arr_ty) (Array.of_list arrval) in
+          let tmp = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "_t" builder in
+          ignore(L.build_store arr tmp builder);
+          let ptr = L.build_bitcast tmp (ltype_of_typ t) "_t" builder in
+          L.build_store ptr des builder
+        end
+        else begin
+
         let ty_l = gen_type_list [] arr_ty num in
         let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder in
         let ptr = L.build_bitcast spc (ltype_of_typ t) "_t" builder in
 
         ignore(List.fold_left (store_helper builder) ptr ty_l);
         L.build_store ptr des builder
+        end
 
       | A.Struct(_, l) ->
         let store_helper builder des (t,n) =
