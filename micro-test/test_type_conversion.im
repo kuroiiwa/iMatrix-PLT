@@ -1,0 +1,27 @@
+int main() {
+	
+	int i1 = 105;
+	char c1 = 'a';
+	float f1 = 102.;
+
+	int c2i = char2int(c1);
+	float c2f = char2float(c1);
+	int f2i = float2int(f1);
+	char f2c = float2char(f1);
+	float i2f = int2float(i1);
+	char i2c = int2char(i1);
+	
+	print(i1);
+	print(c1);
+	print(f1);
+	print("");
+	print(c2i);
+	print(c2f);
+	print(f2i);
+	print(f2c);
+	print(i2f);
+	print(i2c);
+	
+
+	return 0;
+}

@@ -204,8 +204,6 @@ let check program =
     | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
     | _ -> raise(Failure("illegal expression in struct access at " ^ string_of_expr e1 ^ " " ^ string_of_expr e2))
 
-
-
   (**** Check expr including type and function call correctness ****)
   and check_expr (var_symbols, func_symbols) = function
       Literal  l -> (Int, SLiteral l)
@@ -395,6 +393,12 @@ let check program =
       (Img,   "readimg",      [String]);
       (Void,  "saveimg",      [String; Img]);
       (Void,  "showimg",      [Img]);
+      (Char,  "float2char",  [Float]);
+      (Int,   "float2int",   [Float]);
+      (Char,  "int2char",    [Int]);
+      (Float, "int2float",   [Int]);
+      (Int,   "char2int",    [Char]);
+      (Float, "char2float",  [Char]);
       ]
   in
 

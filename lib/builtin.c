@@ -6,6 +6,47 @@
 
 #define accImg(img,i,j,k) (img->data[3 * ((i) * img->col + (j)) + (k)])
 
+double int2float(int x) {
+	double result = (double) x;
+	return result;
+}
+
+double char2float(char x) {
+	double result = (double) x;
+	return result;
+}
+
+int float2int(double x) {
+	int result = (int) x;
+	return result;
+}
+
+int char2int(char x) {
+	int result = (int) x;
+	return result;
+}
+
+char float2char(double x) {
+	char result;
+	if (x <= 0)
+		result = (char) 0;
+	else if (x >= 255)
+		result = (char) 255;
+	else
+		result = (char) x;
+	return result;
+}
+
+char int2char(int x) {
+	char result;
+	if (x <= 0)
+		result = (char) 0;
+	else if (x >= 255)
+		result = (char) 255;
+	else
+		result = (char) x;
+	return result;
+}
 
 void __printMat(const struct mat* a) {
 	assert(a != NULL && "try to print empty matrix");

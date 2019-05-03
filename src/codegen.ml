@@ -206,6 +206,12 @@ let translate program =
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
       ("showimg",       A.Void, i32_t, [| img_t |]);
+      ("float2int",     A.Int,  i32_t, [| float_t|]);
+      ("float2char",    A.Char, i8_t,  [| float_t|]);
+      ("int2float",     A.Float,float_t, [|i32_t|]);
+      ("int2char",      A.Char, i8_t,  [|i32_t|]);
+      ("char2float",    A.Float,float_t, [|i8_t|]);
+      ("char2int",      A.Int,  i32_t, [|i8_t|]);
     ]
     in
     let add_builtit m (name, ty, return_ty, para_tylist) =
@@ -642,7 +648,7 @@ let translate program =
       let func = match t with
         | A.Mat -> StringMap.find "__matRow" internal_funcs
         | A.Img -> StringMap.find "__imgRow" internal_funcs
-        | _ -> raise(InternalError("row() function unexpectec input"))
+        | _ -> raise(InternalError("row() function unexpected input"))
       in
       L.build_call func [| e' |] "_row" builder
 
@@ -652,7 +658,7 @@ let translate program =
       let func = match t with
         | A.Mat -> StringMap.find "__matCol" internal_funcs
         | A.Img -> StringMap.find "__imgCol" internal_funcs
-        | _ -> raise(InternalError("col() function unexpectec input"))
+        | _ -> raise(InternalError("col() function unexpected input"))
       in
       L.build_call func [| e' |] "_col" builder
 
