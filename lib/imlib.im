@@ -1,4 +1,4 @@
-int abs(int input) {
+int abs_int(int input) {
 	int result;
 
 	if (input >= 255) 
@@ -15,14 +15,14 @@ int abs(int input) {
 	return result;
 }
 
-int relu(int input) {
+int relu_int(int input) {
 	int result;
 
 	if (input >= 255) 
 		input = 255;
 	if (input <= -255)
 		input = -255;
-		
+
 	if (input >= 0)
 		result = input;
 	else
@@ -103,7 +103,7 @@ img edgeDetection(img imgIn, int threshold) {
 							- imgIn[ i][j_n1][k] - imgIn[ i][j_p1][k]
 							- imgIn[ i_p1][j_n1][k] - imgIn[ i_p1][j][k] - imgIn[ i_p1][j_p1][k];
 					if (gradSumTemp < 0)
-						// abs
+						// abs_int
 						gradSumTemp = - gradSumTemp;
 					gradSum = gradSum + gradSumTemp;
 				}
@@ -152,6 +152,28 @@ img RBG_regularization(img imgIn) {
 
 	// compute delta
 	int all_sum = r_sum + g_sum + b_sum;
+	float r_factor = int2float(all_sum) / (int2float(r_sum) * 3.);
+	float g_factor = int2float(all_sum) / (int2float(g_sum) * 3.);
+	float b_factor = int2float(all_sum) / (int2float(b_sum) * 3.);
+
+
+	float temp_r, temp_g, temp_b;
+	//char char_r, char_g, char_b;
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			temp_r = int2float(imgIn[i][j][0]) * r_factor;
+			temp_g = int2float(imgIn[i][j][1]) * g_factor;
+			temp_b = int2float(imgIn[i][j][2]) * b_factor;/*
+			char_r = int2char(relu_int(float2int(temp_r)));
+			char_g = int2char(relu_int(float2int(temp_g)));
+			char_b = int2char(relu_int(float2int(temp_b)));*/
+			imgOut[i][j][0] = relu_int(float2int(temp_r));
+			imgOut[i][j][1] = relu_int(float2int(temp_g));
+			imgOut[i][j][2] = relu_int(float2int(temp_b));
+		}
+	}
+
+	/*
 	int r_ave = r_sum / pixel_count;
 	int g_ave = g_sum / pixel_count;
 	int b_ave = b_sum / pixel_count;
@@ -164,11 +186,12 @@ img RBG_regularization(img imgIn) {
 	// write to imgOut
 	for (i = 0; i < row; ++i) {
 		for (j = 0; j < col; ++j) {
-			imgOut[i][j][0] = relu(imgIn[i][j][0] - delta_r);
-			imgOut[i][j][1] = relu(imgIn[i][j][1] - delta_r);
-			imgOut[i][j][2] = relu(imgIn[i][j][2] - delta_r);
+			imgOut[i][j][0] = relu_int(imgIn[i][j][0] - delta_r);
+			imgOut[i][j][1] = relu_int(imgIn[i][j][1] - delta_r);
+			imgOut[i][j][2] = relu_int(imgIn[i][j][2] - delta_r);
 		}
 	}
+	*/
 
 	return imgOut;
 }
