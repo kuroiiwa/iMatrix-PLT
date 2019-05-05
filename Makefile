@@ -1,5 +1,5 @@
 RESULT  = imatrix
-SOURCES = src/scanner.mll src/microcparse.mly src/ast.ml src/semant.ml src/sast.ml src/codegen.ml src/microc.ml
+SOURCES = src/scanner.mll src/microcparse.mly src/ast.ml src/sast.ml src/semant.ml src/codegen.ml src/microc.ml
 PACKS = llvm llvm.analysis
 
 all: native-code
