@@ -555,44 +555,44 @@ struct img* __imgOperator(const struct img* m1, const struct img* m2, char op) {
 // 	return imgOut;
 // }
 
-struct img* edgeDetection(struct img* imgIn, int threshold) {
-	//use 3 x 3 filter for edge detection
-	const int row = imgIn -> row;
-	const int col = imgIn -> col;
-	const int layer = 3;
+// struct img* edgeDetection(struct img* imgIn, int threshold) {
+// 	//use 3 x 3 filter for edge detection
+// 	const int row = imgIn -> row;
+// 	const int col = imgIn -> col;
+// 	const int layer = 3;
 
-	struct img* imgOut = malloc_img(row, col);
-	for (int i = 0; i < row; i++) {
-		for (int j = 0; j < col; j++) {
-			// for the edge of the input image, we simply ignore them
-			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
-				for (int k = 0; k < layer; k++)
-					accImg(imgOut, i, j, k) = 0;
-			}
-			// else, we compute the gradients and judge if it is edge
-			else {
-				float gradSum = 0; // total gradients
-				for (int k = 0; k < layer; k++) {
-					gradSum += abs(8 * accImg(imgIn,i,j,k)
-							- accImg(imgIn, i-1,j-1,k) - accImg(imgIn, i-1,j,k)  - accImg(imgIn, i-1,j+1,k)
-							- accImg(imgIn, i,j-1,k) - accImg(imgIn, i,j+1,k)
-							- accImg(imgIn, i+1,j-1,k) - accImg(imgIn, i+1,j,k) - accImg(imgIn, i+1,j+1,k));
-				}
-				//printf("%f\n",gradSum);
-				gradSum /= layer;
-				if (gradSum >= threshold) {
-					for (int k = 0; k < layer; k++)
-						accImg(imgOut, i,j,k) = accImg(imgIn,i,j,k);
-						// imgOut -> data[i][j][k] = imgIn -> data[i][j][k];
-				}
-				else {
-					for (int k = 0; k < layer; k++)
-						accImg(imgOut,i,j,k) = 0;
-						// imgOut -> data[i][j][k] = 0;
-				}
-			}
-		}
-	}
-	return imgOut;
-}
+// 	struct img* imgOut = malloc_img(row, col);
+// 	for (int i = 0; i < row; i++) {
+// 		for (int j = 0; j < col; j++) {
+// 			// for the edge of the input image, we simply ignore them
+// 			if (i == 0 || j == 0 || i == row - 1 || j == col - 1) {
+// 				for (int k = 0; k < layer; k++)
+// 					accImg(imgOut, i, j, k) = 0;
+// 			}
+// 			// else, we compute the gradients and judge if it is edge
+// 			else {
+// 				float gradSum = 0; // total gradients
+// 				for (int k = 0; k < layer; k++) {
+// 					gradSum += abs(8 * accImg(imgIn,i,j,k)
+// 							- accImg(imgIn, i-1,j-1,k) - accImg(imgIn, i-1,j,k)  - accImg(imgIn, i-1,j+1,k)
+// 							- accImg(imgIn, i,j-1,k) - accImg(imgIn, i,j+1,k)
+// 							- accImg(imgIn, i+1,j-1,k) - accImg(imgIn, i+1,j,k) - accImg(imgIn, i+1,j+1,k));
+// 				}
+// 				//printf("%f\n",gradSum);
+// 				gradSum /= layer;
+// 				if (gradSum >= threshold) {
+// 					for (int k = 0; k < layer; k++)
+// 						accImg(imgOut, i,j,k) = accImg(imgIn,i,j,k);
+// 						// imgOut -> data[i][j][k] = imgIn -> data[i][j][k];
+// 				}
+// 				else {
+// 					for (int k = 0; k < layer; k++)
+// 						accImg(imgOut,i,j,k) = 0;
+// 						// imgOut -> data[i][j][k] = 0;
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return imgOut;
+// }
 

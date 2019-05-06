@@ -4,6 +4,7 @@ open Ast
 open Sast
 
 module StringMap = Map.Make(String)
+module StringSet = Set.Make(String)
 
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong.
@@ -204,15 +205,21 @@ let check program =
     | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
     | _ -> raise(Failure("illegal expression in struct access at " ^ string_of_expr e1 ^ " " ^ string_of_expr e2))
 
-(*   and all_constant prev arr_val = match arr_val with
+  and all_constant prev arr_val = match arr_val with
     | (Array(_), SArrVal(l)) -> (List.fold_left all_constant true l) && prev
     | (Int, SLiteral(_)) -> true && prev
     | (Float, SFliteral(_)) -> true && prev
-    | _ -> false *)
+    | _ -> false
 
   and replace_int_literal arr_val = match arr_val with
     | (Int, SLiteral(x)) -> (Float, SFliteral(string_of_int x))
+    | (Array(_) as arr_ty, SArrVal(l)) -> (iarr2farr arr_ty, SArrVal(List.map replace_int_literal l))
     | _ -> arr_val
+
+  and iarr2farr = function
+    | Array(t, n) -> Array(iarr2farr t, n)
+    | Int -> Float
+    | _ -> raise(Failure("iarr2farr failed"))
 
   and float2int_literal lt (rt, re) = match lt, (!rt, !re) with
     | Float, (Int, SLiteral(x)) -> re := SFliteral(string_of_int x); rt := Float
@@ -220,11 +227,15 @@ let check program =
       let (rt', re') = (ref rt_nest, ref re_nest) in
       let () = float2int_literal Float (rt', re') in
       re := SUnop(op, (!rt', !re')); rt := !rt'
-    | Array(_) as larr_ty, (Array(_) as rarr_ty, SArrVal(l))
-      when get_type_arr larr_ty = Float  && get_type_arr rarr_ty = Int ->
-      raise NotImplemented
-(*       let l' = List.map replace_int_literal l in
-      re := SArrVal(l') *)
+    | Array(_), (Array(_), SArrVal(l))
+      when get_type_arr lt = Float && get_type_arr !rt = Int
+      && List.fold_left all_constant true l ->
+      let l' = List.map replace_int_literal l in
+      re := SArrVal(l'); rt := iarr2farr !rt
+    | Mat, (Array(_), SArrVal(l))
+      when get_type_arr !rt =Int && List.fold_left all_constant true l ->
+      let l' = List.map replace_int_literal l in
+      re := SArrVal(l'); rt := iarr2farr !rt
     | _ -> ()
 
   (**** Check expr including type and function call correctness ****)
@@ -437,6 +448,7 @@ let check program =
       (Float, "int2float",   [Int]);
       (Int,   "char2int",    [Char]);
       (Float, "char2float",  [Char]);
+      (Void , "print",       [Void]);
       ]
   in
 

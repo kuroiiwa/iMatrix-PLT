@@ -36,6 +36,8 @@ let bind_mat_img typ id (e1, e2) = match typ with
 
 let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 
+let bnid_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_l
+
 %}
 
 
@@ -73,15 +75,23 @@ let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 %%
 
 program:
-  includes decls EOF { (List.rev $1, List.rev $2) }
+  program_opt EOF { $1 }
+
+program_opt:
+  | /* nothing */ { ([],[]) }
+  | includes decls{ (List.rev $1, List.rev $2) }
+  | decls         { ([], List.rev $1)}
 
 includes:
- | /* nothing */ { []   }
  | INCLUDE STRLIT       { [$2] }
  | includes INCLUDE STRLIT { $3 :: $1 }
 
 decls:
-   /* nothing */ { []              }
+ | vdecl {[Globaldcl($1)]}
+ | fdecl {[Func($1)]}
+ | fdecl_bodyless {[Func_dcl($1)]}
+ | struct_dcl {[Struct_dcl($1)]}
+ | typ id_list SEMI { bnid_glb_list $1 $2 }
  | decls vdecl { Globaldcl($2) :: $1 }
  | decls fdecl { Func($2) :: $1 }
  | decls fdecl_bodyless { Func_dcl($2) :: $1 }
@@ -154,7 +164,6 @@ stmt_list:
   | stmt_list stmt { Stmt($2) :: $1 }
 
 vdecl:
-    typ ID SEMI { bind_dcl $1 $2 Noexpr }
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
   | typ ID LBRACK dim_opt RBRACK SEMI { bind_arr_dcl_noexpr $1 $2 $4 }
   | typ ID LBRACK dim_opt RBRACK ASSIGN expr SEMI { bind_arr_dcl_expr $1 $2 $4 $7}
