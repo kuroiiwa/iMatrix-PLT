@@ -1,0 +1,12 @@
+include "../lib/imlib.im"
+
+int main()
+{
+	mat m(2,3);
+	mat b = addconst_mat(m, 2.);
+		
+	print(m);
+	print(b);
+
+	return 0;
+}

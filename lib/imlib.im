@@ -16,12 +16,11 @@ int abs_int(int input) {
 }
 
 int relu_int(int input) {
+	// PLEASE USE THIS ON IMAGES TO AVOID OVERFLOW
 	int result;
 
 	if (input >= 255) 
 		input = 255;
-	if (input <= -255)
-		input = -255;
 
 	if (input >= 0)
 		result = input;
@@ -32,6 +31,7 @@ int relu_int(int input) {
 }
 
 img aveFilter(img imgIn, int fWidth) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
 	/*
 	Input a imgIn(row, col, layer), implement average filter of
 	 a radius of fWidth. The output is imgOut.
@@ -73,6 +73,7 @@ img aveFilter(img imgIn, int fWidth) {
 }
 
 img edgeDetection(img imgIn, int threshold) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
 	//use 3 x 3 filter for edge detection
 	int row = row(imgIn);
 	int col = col(imgIn);
@@ -125,6 +126,7 @@ img edgeDetection(img imgIn, int threshold) {
 
 
 img RBG_regularization(img imgIn) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
 	// regularize 3 channels to increase the contrast of the image 
 
 	int row = row(imgIn);
@@ -198,6 +200,7 @@ img RBG_regularization(img imgIn) {
 
 
 img threshold_filter_separate(img imgIn, int r_threshold, int g_threshold, int b_threshold, string option) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
 	// filter 3 channels of the image , we filter 3 channels seperately,
 	// options are "greater" and "less" (than threshold) 
 
@@ -246,10 +249,11 @@ img threshold_filter_separate(img imgIn, int r_threshold, int g_threshold, int b
 }
 
 img threshold_filter_together(img imgIn, int threshold, string option) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
 	// filter 3 channels together, i.e. either keep all 3 channels or throw all of them,
 	// options are "greater" and "less" (than threshold) 
 
-		int row = row(imgIn);
+	int row = row(imgIn);
 	int col = col(imgIn);
 	int layer = 3;
 
@@ -288,6 +292,105 @@ img threshold_filter_together(img imgIn, int threshold, string option) {
 					imgOut[i][j][1] = 0;
 					imgOut[i][j][2] = 0;
 				}
+			}
+		}
+	}
+
+	return imgOut;
+}
+
+mat addconst_mat(mat matIn, float c) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
+	int row = row(matIn);
+	int col = col(matIn);
+
+	mat matOut(row, col);
+	int i, j;
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			matOut[i][j] = matIn[i][j] + c;
+		}
+	}
+
+	return matOut;
+}
+
+img addconst_img(img imgIn, int c) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
+	int row = row(imgIn);
+	int col = col(imgIn);
+
+	img imgOut(row, col);
+	int i, j, k;
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			for (k = 0; k < 3; ++k)
+				imgOut[i][j][k] = relu_int(imgIn[i][j][k] + c);
+		}
+	}
+
+	return imgOut;
+}
+
+img img_conv(img imgIn, img conv) {
+	// WILL USE DYNAMIC MEMORY, PLEASE FREE
+	// CONV WIDTH AND HEIGHT SHOULD BE AN ODD NUMBER
+	// conv is the convolution template we use
+
+	int conv_w = col(conv) / 2;
+	int conv_h = row(conv) / 2;
+	int fac_i, fac_j, fac_k;
+	int factor_i = 0;
+	int factor_j = 0;
+	int factor_k = 0;
+	for (fac_i = 0; fac_i < row(conv); ++fac_i) {
+		for (fac_j = 0; fac_j < col(conv); ++fac_j) {
+			factor_i = factor_i + abs_int(conv[fac_i][fac_j][0]);
+			factor_j = factor_j + abs_int(conv[fac_i][fac_j][1]);
+			factor_k = factor_k + abs_int(conv[fac_i][fac_j][2]);
+		}
+	}
+	/*print(factor_i);
+	print(factor_j);
+	print(factor_k);
+	print(conv_w);
+	print(conv_h);*/
+	int row = row(imgIn);
+	int col = col(imgIn);
+
+	img imgOut(row - 2 * conv_h, col - 2 * conv_w);
+
+	int i, j, k;
+	int m, n, p;
+	int temp;
+	int img_i, img_j, img_k;
+	int conv_i, conv_j, conv_k;
+	for (i = 0; i < row - 2 * conv_h; ++i) {
+		for (j = 0; j < col - 2 * conv_w; ++j) {
+			for (k = 0; k < 3; ++k) {
+				// for conv
+				temp = 0;
+				for (m = -conv_h; m < conv_h; ++m) {
+					for (n = -conv_w; n < conv_w; ++n) {
+							img_i = i + m + conv_h;
+							img_j = j + n + conv_w;
+							img_k = k;
+							conv_i = m + conv_h;
+							conv_j = n + conv_w;
+							conv_k = k;
+							temp = temp + imgIn[img_i][img_j][img_k] * conv[conv_i][conv_j][conv_k];
+					}
+				}
+				//print(temp);
+				if (k == 0)
+					temp = relu_int(temp / factor_i);
+				if (k == 1)
+					temp = relu_int(temp / factor_j);
+				if (k == 2)
+					temp = relu_int(temp / factor_k);
+
+				//print(temp);
+				imgOut[i][j][k] = temp;
 			}
 		}
 	}

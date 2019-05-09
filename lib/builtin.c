@@ -62,15 +62,17 @@ void __printMat(const struct mat* a) {
 
 void __printImg(const struct img* a) {
 	assert(a != NULL);
+	int row = a->row;
+	int col = a->col;
 	printf("\nrow: %d col: %d \n", a->row, a->col);
-	// for (int k = 0; k < 3; k++) {
-	// 	for (int i = 0; i < a->row; i++) {
-	// 		for (int j = 0; j < a->col; j++)
-	// 			printf("%d ", a->data[i][j][k]);
-	// 		printf("\n");
-	// 	}
-	// 	printf("\n");
-	// }
+	for (int i = 0; i < row; i++) {
+		for (int j = 0; j < col; j++) {
+			for (int k = 0; k < 3; k++) 
+				printf("%d ", a->data[i * col * 3 + j * 3 + k]);
+			printf("\n");
+		}
+		printf("\n");
+	}
 }
 
 int __matRow(const struct mat* a) { assert(a != NULL); return a->row; }
@@ -113,7 +115,6 @@ void __setMat(struct mat* a, double** arr, int row, int col) {
 		for (int c = 0; c < col; c++)
 			a->data[a->col * r + c] = arr[r][c];
 }
-
 
 struct img* malloc_img(int row, int col) {
 	assert(row > 0 && col > 0);
