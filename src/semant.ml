@@ -4,6 +4,7 @@ open Ast
 open Sast
 
 module StringMap = Map.Make(String)
+module StringSet = Set.Make(String)
 
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong.
@@ -61,7 +62,7 @@ let check program =
       let check_type t lst = if t <> (fst lst) then
           raise(Failure ("type in array is not unique")) else ()
       in
-      ignore( List.iter (check_type ty) sarr);
+      ignore(List.iter (check_type ty) sarr);
       (Array(ty, List.length sarr), SArrVal(sarr))
   in
 
@@ -204,6 +205,39 @@ let check program =
     | Slice(s,_) when List.exists (fun (_,n) -> n = s) mem_list = false -> raise(Failure(string_of_expr e1 ^ " does not have member " ^ s))
     | _ -> raise(Failure("illegal expression in struct access at " ^ string_of_expr e1 ^ " " ^ string_of_expr e2))
 
+  and all_constant prev arr_val = match arr_val with
+    | (Array(_), SArrVal(l)) -> (List.fold_left all_constant true l) && prev
+    | (Int, SLiteral(_)) -> true && prev
+    | (Float, SFliteral(_)) -> true && prev
+    | _ -> false
+
+  and replace_int_literal arr_val = match arr_val with
+    | (Int, SLiteral(x)) -> (Float, SFliteral(string_of_int x))
+    | (Array(_) as arr_ty, SArrVal(l)) -> (iarr2farr arr_ty, SArrVal(List.map replace_int_literal l))
+    | _ -> arr_val
+
+  and iarr2farr = function
+    | Array(t, n) -> Array(iarr2farr t, n)
+    | Int -> Float
+    | _ -> raise(Failure("iarr2farr failed"))
+
+  and float2int_literal lt (rt, re) = match lt, (!rt, !re) with
+    | Float, (Int, SLiteral(x)) -> re := SFliteral(string_of_int x); rt := Float
+    | Float, (Int, SUnop(op, (rt_nest, re_nest))) ->
+      let (rt', re') = (ref rt_nest, ref re_nest) in
+      let () = float2int_literal Float (rt', re') in
+      re := SUnop(op, (!rt', !re')); rt := !rt'
+    | Array(_), (Array(_), SArrVal(l))
+      when get_type_arr lt = Float && get_type_arr !rt = Int
+      && List.fold_left all_constant true l ->
+      let l' = List.map replace_int_literal l in
+      re := SArrVal(l'); rt := iarr2farr !rt
+    | Mat, (Array(_), SArrVal(l))
+      when get_type_arr !rt =Int && List.fold_left all_constant true l ->
+      let l' = List.map replace_int_literal l in
+      re := SArrVal(l'); rt := iarr2farr !rt
+    | _ -> ()
+
   (**** Check expr including type and function call correctness ****)
   and check_expr (var_symbols, func_symbols) = function
       Literal  l -> (Int, SLiteral l)
@@ -221,25 +255,31 @@ let check program =
     | StructAssign(e1, e2) as ex ->
       let (lt, le) = check_expr (var_symbols, func_symbols) e1
       and (rt, e') = check_expr (var_symbols, func_symbols) e2 in
+      let (rt', re') = (ref rt, ref e') in
+      let () = float2int_literal lt (rt', re') in
       let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
                 string_of_typ rt ^ " in " ^ string_of_expr ex
-      in (check_assign lt rt err, SStructAssign((lt, le), (rt, e')))
+      in (check_assign lt !rt' err, SStructAssign((lt, le), (!rt', !re')))
     | Assign(var, e) as ex ->
       let lt = type_of_identifier var_symbols var
       and (rt, e') = check_expr (var_symbols, func_symbols) e in
+      let (rt', re') = (ref rt, ref e') in
+      let () = float2int_literal lt (rt', re') in
       let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
-                string_of_typ rt ^ " in " ^ string_of_expr ex
-      in (check_assign lt rt err, SAssign(var, (rt, e')))
+                string_of_typ !rt' ^ " in " ^ string_of_expr ex
+      in (check_assign lt !rt' err, SAssign(var, (!rt', !re')))
     | SliceAssign(var, lst, e) as ex ->
       let (lt, le) = check_expr (var_symbols, func_symbols) (Slice(var, lst))
       and (rt, re) = check_expr (var_symbols, func_symbols) e in
+      let (rt', re') = (ref rt, ref re) in
+      let () = float2int_literal lt (rt', re') in
       let slice_list = (match le with
           | SSlice(_, l) -> l
           | _ -> raise(Failure("internal error: slicing assign should be a valid slicing")))
       in
       let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^
                 string_of_typ rt ^ " in " ^ string_of_expr ex
-      in (check_assign lt rt err, SSliceAssign(var, slice_list, (rt, re)))
+      in (check_assign lt !rt' err, SSliceAssign(var, slice_list, (!rt', !re')))
     | Unop(op, e) as ex ->
       let (t, e') = check_expr (var_symbols, func_symbols) e in
       let ty = match op with
@@ -254,6 +294,8 @@ let check program =
       and (t2, e2') = check_expr (var_symbols, func_symbols) e2 in
       (* All binary operators require operands of the same type *)
       let same = t1 = t2 in
+      let (t1', re1) = (ref t1, ref e1')
+      and (t2', re2) = (ref t2, ref e2') in
       (* Determine expression type based on operator and operand types *)
       let ty = match op with
           Add | Sub | Mult | Div | Mod | Pow
@@ -270,11 +312,14 @@ let check program =
           when same && t1 = Mat -> Mat
         | Add | Sub | Mult | Div
           when same && t1 = Img -> Img
+        | Add | Sub when (not same) && ((t1 = Int && t2 = Float) || (t2 = Int && t1 = Float))
+          ->  let (ty', int_e) = if t1 = Int then (t1', re1) else (t2', re2) in
+          let () = float2int_literal Float (ty', int_e) in Float
         | _ -> raise (
             Failure ("illegal binary operator " ^
                      string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
-      in (ty, SBinop((t1, e1'), op, (t2, e2')))
+      in (ty, SBinop((!t1', !re1), op, (!t2', !re2)))
     | Call("print", [e]) ->
       (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
     | Call("row", [e]) ->
@@ -297,9 +342,11 @@ let check program =
                         " arguments in " ^ string_of_expr call))
       else let check_call (ft, _, _) e =
              let (et, e') = check_expr (var_symbols, func_symbols) e in
+             let (et', re') = (ref et, ref e') in
+             let () = float2int_literal ft (et', re') in
              let err = "illegal argument found " ^ string_of_typ et ^
                        " expected " ^ string_of_typ ft ^ " in " ^ string_of_expr e
-             in (check_assign ft et err, e')
+             in (check_assign ft !et' err, !re')
         in
         let args' = List.map2 check_call fd.formals args
         in (fd.typ, SCall(fname, args'))
@@ -361,9 +408,11 @@ let check program =
     | _,Noexpr -> (ty, n, (Void, SNoexpr))
     | _ ->
       let (rt, e') = check_expr (var_symbols, func_symbols) e in
+      let (rt', re) = (ref rt, ref e') in
+      let () = float2int_literal ty (rt', re) in
       let err = "illegal assignment " ^ string_of_typ ty ^ " = " ^
                 string_of_typ rt ^ " in " ^ n ^ " = " ^ string_of_expr e
-      in (check_assign ty rt err, n, (rt, e'))
+      in (check_assign ty !rt' err, n, (!rt', !re))
   in
 
 
@@ -399,6 +448,7 @@ let check program =
       (Float, "int2float",   [Int]);
       (Int,   "char2int",    [Char]);
       (Float, "char2float",  [Char]);
+      (Void , "print",       [Void]);
       ]
   in
 
