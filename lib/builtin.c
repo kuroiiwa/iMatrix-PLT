@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <math.h>
+#include <string.h>
 #include "builtin.h"
 
-#define accImg(img,i,j,k) (img->data[3 * ((i) * img->col + (j)) + (k)])
+#define accImg(img,i,j,k) ((img)->data[3 * ((i) * (img)->col + (j)) + (k)])
+#define accMat(mat,i,j) ((mat)->data[((i) * (mat)->col) + (j)])
 
 double int2float(int x) {
 	double result = (double) x;
@@ -47,6 +50,16 @@ char int2char(int x) {
 		result = (char) x;
 	return result;
 }
+
+int __intPower(int a, int b) {
+	return (int)pow((double)a, (double)b);
+}
+
+double __floatPower(double a, double b) {
+	return pow(a,b);
+}
+
+
 
 void __printMat(const struct mat* a) {
 	assert(a != NULL && "try to print empty matrix");
@@ -516,6 +529,39 @@ struct img* __imgOperator(const struct img* m1, const struct img* m2, char op) {
 					default: break;
 				}
 	return m3;
+}
+
+struct mat* __matTranspose(const struct mat* m) {
+	assert(m != NULL);
+
+	int r = m->col, c = m->row;
+	struct mat* res = malloc_mat(r, c);
+	for (int i = 0; i < c; i++)
+		for (int j = 0; j < r; j++)
+			res->data[i * r + j] = accMat(m, i, j);
+
+	return res;
+}
+
+static void __copyMat(const struct mat* src, struct mat* des) {
+	memcpy(des->data, src->data, src->row * src->col * sizeof(double));
+}
+struct mat* __matPower(const struct mat* m, int p) {
+	assert(m != NULL && m->row == m->col);
+	assert(p > 0);
+
+	int r = m->row, c = m->col;
+	struct mat* unit = malloc_mat(r, c);
+	for (int i = 0; i < r; i++)
+		accMat(unit, i, i) = 1;
+	struct mat* tmp;
+	for (int i = 0; i < p; i++) {
+		if (i > 0) free_mat(tmp);
+		tmp = __matMul(m, unit);
+		__copyMat(tmp, unit);
+	}
+
+	return tmp;
 }
 
 // struct img* aveFilter(struct img* imgIn, int fWidth) {

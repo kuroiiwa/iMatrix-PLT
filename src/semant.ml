@@ -285,6 +285,7 @@ let check program =
       let ty = match op with
           Neg when t = Int || t = Float -> t
         | Not when t = Bool -> Bool
+        | Transpose when t = Mat -> Mat
         | _ -> raise (Failure ("illegal unary operator " ^
                                string_of_uop op ^ string_of_typ t ^
                                " in " ^ string_of_expr ex))
@@ -302,6 +303,7 @@ let check program =
           when same && t1 = Int -> Int
         | Add | Sub | Mult | Div | Pow
           when same && t1 = Float -> Float
+        | Pow when t1 = Mat && t2 = Int -> Mat
         | Equal | Neq
           when same -> Bool
         | Less | Leq | Greater | Geq
@@ -392,6 +394,8 @@ let check program =
         | _,Assign _ -> raise(Failure ("assign in init not allowed"))
         | _,Call _ when isGlobal -> raise(Failure ("calling funciton initializer in global not allowed"))
         | _,Slice _ when isGlobal -> raise(Failure ("slicing initializer in global not allowed"))
+        | Mat,_ when e != Noexpr && isGlobal -> raise(Failure("mat initializer in globa is not allowed"))
+        | Img,_ when e != Noexpr && isGlobal -> raise(Failure("img initializer in globa is not allowed"))
         | Array(_) as arr,_ -> let t = get_type_arr arr in
           (match t with
            | Void -> raise(Failure ("illegal void " ^ n))

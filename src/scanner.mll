@@ -33,6 +33,7 @@ rule token = parse
 | "=="     { EQ }                       (* logical *)
 | "!="     { NEQ }
 | '<'      { LT }
+| '''      { QUOTE }
 | "<="     { LEQ }
 | ">"      { GT }
 | ">="     { GEQ }
@@ -43,8 +44,6 @@ rule token = parse
 | "else"   { ELSE }
 | "for"    { FOR }
 | "while"  { WHILE }
-(*| "break"  { BREAK }
-| "continue"  { CONTINUE } *)
 | "return" { RETURN }
 | "int"    { INT }                       (* data type *)
 | "bool"   { BOOL }

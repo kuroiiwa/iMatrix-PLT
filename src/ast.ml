@@ -3,7 +3,7 @@
 type op = Add | Sub | Mult | Div | Mod | Pow | Equal | Neq | Less | Leq | Greater | Geq |
           And | Or | Matmul
 
-type uop = Neg | Not
+type uop = Neg | Not | Transpose
 
 
 type typ = Int | Bool | Float | Char | String | Void | Mat | Img | Array of arr_type | Struct of struct_type
@@ -93,6 +93,7 @@ let string_of_op = function
 let string_of_uop = function
     Neg -> "-"
   | Not -> "!"
+  | Transpose -> "Transpose"
 
 
 let rec string_of_expr = function
@@ -111,6 +112,7 @@ let rec string_of_expr = function
   | StructAssign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
   | Binop(e1, o, e2) ->
       string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+  | Unop(Transpose, e) -> string_of_expr e ^ "'"
   | Unop(o, e) -> string_of_uop o ^ string_of_expr e
   | Assign(v, e) -> v ^ " = " ^ string_of_expr e
   | SliceAssign(v, lst, e) -> v ^ String.concat "" (List.map (fun (a,b) -> "[" ^ string_of_expr a ^ ":" ^ string_of_expr b ^ "]") lst)

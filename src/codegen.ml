@@ -143,7 +143,7 @@ let translate program =
     | SFunc(func) -> func :: lst
     | _ -> lst
   in
-  let functions = List.fold_left pick_func [] program in
+  let functions = List.rev (List.fold_left pick_func [] program) in
 
   (* functions that are only used internally *)
   let __printf_t : L.lltype =
@@ -176,6 +176,11 @@ let translate program =
       ("__imgRow",      i32_t, [| img_t |]);
       ("__imgCol",      i32_t, [| img_t |]);
       ("__matMul",      mat_t, [| mat_t; mat_t |]);
+
+      ("__intPower",    i32_t, [| i32_t; i32_t|]);
+      ("__floatPower",  float_t,[|float_t; float_t|]);
+      ("__matTranspose",mat_t, [| mat_t |]);
+      ("__matPower",    mat_t, [|mat_t; i32_t|]);
     ] in
     let add_internal_func m (name, return_ty, para_tylist) =
       let llty = L.function_type return_ty para_tylist in
@@ -271,7 +276,8 @@ let translate program =
        | A.Leq     -> L.const_fcmp L.Fcmp.Ole
        | A.Greater -> L.const_fcmp L.Fcmp.Ogt
        | A.Geq     -> L.const_fcmp L.Fcmp.Oge
-       | A.And | A.Or | A.Mod | A.Pow | A.Matmul ->
+       | A.Pow     -> raise(Failure("power is actually a function"))
+       | A.And | A.Or | A.Mod | A.Matmul ->
          raise (InternalError("semant should have rejected illegal op on float"))
       ) e1' e2'
     | SBinop ((A.Mat,_ ), _, _) | SBinop ((A.Img,_ ), _, _)
@@ -293,7 +299,7 @@ let translate program =
        | A.Leq     -> L.const_icmp L.Icmp.Sle
        | A.Greater -> L.const_icmp L.Icmp.Sgt
        | A.Geq     -> L.const_icmp L.Icmp.Sge
-       | A.Pow     ->  raise NotImplemented
+       | A.Pow     -> raise(Failure("power is actually a function"))
        | _ -> raise (InternalError("semant should have rejected illegal op"))
       ) e1' e2'
     | SUnop(op, ((t, _) as e)) ->
@@ -301,7 +307,8 @@ let translate program =
       (match op with
          A.Neg when t = A.Float -> L.const_fneg
        | A.Neg                  -> L.const_neg
-       | A.Not                  -> L.const_not) e'
+       | A.Not                  -> L.const_not
+       | A.Transpose             -> raise(InternalError("semant shoud have rejected illegal op"))) e'
     | SCall (_, _) -> raise(InternalError("function call init should be rejected by semantic check"))
   in
 
@@ -662,7 +669,21 @@ let translate program =
       in
       L.build_call func [| e' |] "_col" builder
 
+    and call_float_power e1 e2 tmp builder =
+      let func = StringMap.find "__floatPower" internal_funcs in
+      L.build_call func [| e1; e2 |] tmp builder
 
+    and call_int_power e1 e2 tmp builder =
+      let func = StringMap.find "__intPower" internal_funcs in
+      L.build_call func [| e1; e2 |] tmp builder
+
+    and call_transpose e tmp builder =
+      let func = StringMap.find "__matTranspose" internal_funcs in
+      L.build_call func [| e |] tmp builder
+
+    and call_mat_power e1 e2 tmp builder =
+      let func = StringMap.find "__matPower" internal_funcs in
+      L.build_call func [| e1; e2 |] tmp builder
 
     (* Construct code for an expression; return its value *)
     and expr (local_vars, builder) ((ty, e) : sexpr) = match e with
@@ -751,10 +772,14 @@ let translate program =
          | A.Leq     -> L.build_fcmp L.Fcmp.Ole
          | A.Greater -> L.build_fcmp L.Fcmp.Ogt
          | A.Geq     -> L.build_fcmp L.Fcmp.Oge
-         | A.And | A.Or | A.Mod | A.Pow | A.Matmul ->
+         | A.Pow     -> call_float_power
+         | A.And | A.Or | A.Mod | A.Matmul ->
            raise (InternalError "semant should have rejected illegal op on float")
         ) e1' e2' "tmp" builder
-
+      | SBinop ((A.Mat,_) as e1, A.Pow, e2) ->
+        let e1' = expr (local_vars, builder) e1
+        and e2' = expr (local_vars, builder) e2 in
+        call_mat_power e1' e2' "tmp" builder
       | SBinop ((ty,_ ) as e1, op, e2) when ty=A.Mat||ty=A.Img ->
         let e1' = expr (local_vars, builder) e1
         and e2' = expr (local_vars, builder) e2
@@ -791,7 +816,7 @@ let translate program =
          | A.Leq     -> L.build_icmp L.Icmp.Sle
          | A.Greater -> L.build_icmp L.Icmp.Sgt
          | A.Geq     -> L.build_icmp L.Icmp.Sge
-         | A.Pow     -> raise NotImplemented
+         | A.Pow     -> call_int_power
          | A.Matmul  ->  raise (InternalError "semant should have rejected illegal op on int")
         ) e1' e2' "_t" builder
 
@@ -800,7 +825,9 @@ let translate program =
         (match op with
            A.Neg when t = A.Float -> L.build_fneg
          | A.Neg                  -> L.build_neg
-         | A.Not                  -> L.build_not) e' "_t" builder
+         | A.Not                  -> L.build_not
+         | A.Transpose when t = A.Mat -> call_transpose
+         | A.Transpose -> raise(InternalError("smeant should have rejected illegal transpose"))) e' "_t" builder
 
       | SCall ("print", [e]) ->
         call_print (local_vars, builder) e
@@ -971,5 +998,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
-  ignore(L.dump_module the_module);
+(*   ignore(L.dump_module the_module); *)
   the_module

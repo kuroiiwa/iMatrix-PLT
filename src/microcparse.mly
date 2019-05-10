@@ -36,17 +36,17 @@ let bind_mat_img typ id (e1, e2) = match typ with
 
 let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 
-let bnid_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_l
+let bind_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_l
 
 %}
 
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE INCLUDE
 %token SEMI COMMA DOT COLON
-%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS MATMUL
+%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS MATMUL QUOTE
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
-%token IF ELSE FOR WHILE /* BREAK CONTINUE */ RETURN
+%token IF ELSE FOR WHILE RETURN
 %token INT BOOL FLOAT CHAR STRING MAT IMG VOID STRUCT
 %token TRUE FALSE
 
@@ -68,6 +68,7 @@ let bnid_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_
 %left LT GT LEQ GEQ               /* precedence level: 9 */
 %left PLUS MINUS                  /* precedence level: 11 */
 %left TIMES DIVIDE MODULO MATMUL POWER /* precedence level: 12 */
+%left QUOTE
 %right NOT                        /* precedence level: 14 */
 %left DOT
 %nonassoc SELFPLUS SELFMINUS      /* precedence level: 15 */
@@ -91,7 +92,7 @@ decls:
  | fdecl {[Func($1)]}
  | fdecl_bodyless {[Func_dcl($1)]}
  | struct_dcl {[Struct_dcl($1)]}
- | typ id_list SEMI { bnid_glb_list $1 $2 }
+ | typ id_list SEMI { bind_glb_list $1 $2 }
  | decls vdecl { Globaldcl($2) :: $1 }
  | decls fdecl { Func($2) :: $1 }
  | decls fdecl_bodyless { Func_dcl($2) :: $1 }
@@ -228,6 +229,7 @@ expr:
   | FALSE            { BoolLit(false) }
   | MINUS expr %prec NOT { Unop(Neg, $2)      }
   | NOT expr         { Unop(Not, $2)          }
+  | expr QUOTE       { Unop(Transpose, $1)    }
   | ID ASSIGN expr   { Assign($1, $3)         }
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
