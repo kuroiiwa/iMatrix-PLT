@@ -192,6 +192,11 @@ let string_of_fdecl fdecl =
   String.concat "" (List.map string_of_func_body fdecl.body) ^
   "}\n"
 
+let string_of_pure_fdecl fdecl =
+  string_of_typ fdecl.typ ^ " " ^
+  fdecl.fname ^ "(" ^ String.concat ", " (List.map string_of_formals fdecl.formals) ^
+  ")\n"
+
 let string_of_struct sdecl =
    "struct " ^ sdecl.name ^ "{\n  " ^ String.concat "\n  " (List.map (fun (t,id) -> string_of_typ t ^ " " ^ id) sdecl.member_list) ^
    "\n}\n"
@@ -200,7 +205,7 @@ let string_of_program lst =
   let helper str = function
   | Globaldcl(dcl) -> str ^ string_of_vdecl dcl
   | Func(f) -> str ^ string_of_fdecl f
-  | Func_dcl(f) -> str ^ string_of_fdecl f
+  | Func_dcl(f) -> str ^ string_of_pure_fdecl f
   | Struct_dcl(d) -> str ^ string_of_struct d
   in
   List.fold_left helper "" lst

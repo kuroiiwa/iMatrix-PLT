@@ -298,6 +298,11 @@ let check program =
       let (t1', re1) = (ref t1, ref e1')
       and (t2', re2) = (ref t2, ref e2') in
       (* Determine expression type based on operator and operand types *)
+      let int_literal_exist (t1, e1) (t2, e2) = match t1,e1,t2,e2 with
+        | Int,SLiteral(_),Float,_ -> true
+        | Float,_,Int,SLiteral(_) -> true
+        | _ -> false
+      in
       let ty = match op with
           Add | Sub | Mult | Div | Mod | Pow
           when same && t1 = Int -> Int
@@ -314,7 +319,7 @@ let check program =
           when same && t1 = Mat -> Mat
         | Add | Sub | Mult | Div
           when same && t1 = Img -> Img
-        | Add | Sub when (not same) && ((t1 = Int && t2 = Float) || (t2 = Int && t1 = Float))
+        | Add | Sub when (not same) && int_literal_exist (t1, e1') (t2, e2')
           ->  let (ty', int_e) = if t1 = Int then (t1', re1) else (t2', re2) in
           let () = float2int_literal Float (ty', int_e) in Float
         | _ -> raise (
@@ -488,11 +493,22 @@ let check program =
       body = fd.body;
     }
     in
-    let res = StringMap.mem n map
-    in match fd_new with
+    let just_declared f_prev f =
+      f_prev.typ = f.typ
+      && f_prev.fname = f.fname
+      && f_prev.formals = f.formals
+      && f_prev.body = []
+    in
+    let dup_decl f_prev f =
+      f_prev.typ <> f.typ
+      || f_prev.formals <> f.formals
+      || f_prev.body <> []
+    in
+    let res = StringMap.mem n map in
+    match fd_new with
       _ when StringMap.mem n built_in_decls -> make_err built_in_err
-    | _ when res && (let f = StringMap.find n map in f.body = []) -> StringMap.add n fd_new map
-    | _ when res && (let f = StringMap.find n map in (f.body <> [] && fd_new.body <> [])) -> make_err dup_err
+    | _ when res && (let f = StringMap.find n map in just_declared f fd_new) -> StringMap.add n fd_new map
+    | _ when res && (let f = StringMap.find n map in dup_decl f fd_new) -> make_err dup_err
     (*        | _ when StringMap.mem n map -> make_err dup_err   *)
     | _ ->  StringMap.add n fd_new map
   in
@@ -500,8 +516,10 @@ let check program =
   (* Check each function *)
   let check_function (var_symbols, func_symbols) funct =
 
+    check_binds_dup "formals" funct.formals;
+
     let body_dcl = List.fold_left pick_binds [] funct.body in
-    check_binds_dup "local" (funct.formals @ body_dcl);
+    check_binds_dup "local" body_dcl;
 
     (**** Check if a expr is bool type ****)
     let check_bool_expr (var_symbols, func_symbols) e =

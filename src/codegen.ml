@@ -740,7 +740,8 @@ let translate program =
         let des = L.build_load (lookup local_vars s) s builder in
         if L.type_of des = mat_t then
           (match t with
-            | A.Mat -> L.build_store e' (lookup local_vars s) builder
+            | A.Mat -> ignore(L.build_store e' (lookup local_vars s) builder);
+              L.build_load (lookup local_vars s) "_t" builder
             | A.Array(_) ->
           let ar = extDim t in
           L.build_call (builtin_f "__setMat") [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
@@ -748,12 +749,14 @@ let translate program =
           )
         else if L.type_of des = img_t then
           (match t with
-            | A.Img -> L.build_store e' (lookup local_vars s) builder
+            | A.Img -> ignore(L.build_store e' (lookup local_vars s) builder);
+              L.build_load (lookup local_vars s) "_t" builder
             | A.Array(_) -> raise NotImplemented
             | _ -> raise(InternalError("Assign type failure"))
           )
-        else
-          L.build_store e' (lookup local_vars s) builder
+        else(
+          ignore(L.build_store e' (lookup local_vars s) builder);
+          L.build_load (lookup local_vars s) "_t" builder)
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
         set_slice_opt (local_vars, builder) (des, lst, e) ty
@@ -855,7 +858,7 @@ let translate program =
         )
       | SCall (f, args) ->
         let (fdef, fdecl) = StringMap.find f function_decls in
-        let llargs = List.rev (List.map (expr (local_vars, builder)) (List.rev args)) in
+        let llargs = (List.map (expr (local_vars, builder)) args) in
         let result = (match fdecl.styp with
               A.Void -> ""
             | _ -> f ^ "_result") in

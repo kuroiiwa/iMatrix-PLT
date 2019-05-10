@@ -5,4 +5,5 @@ int main()
   } else {
     bar; /* Error: undeclared variable */
   }
+  return 0;
 }

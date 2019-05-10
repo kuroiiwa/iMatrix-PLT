@@ -6,8 +6,8 @@ int main()
     i = i + 1;
   }
 
-  while (42) { /* Should be boolean */
-    i = i + 1;
+  while (true) {
+    foo(); /* foo undefined */
   }
-
+  return 0;
 }

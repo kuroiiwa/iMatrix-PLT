@@ -1,8 +1,8 @@
-int foo() {}
+int foo() { return 0;}
 
-int bar() {}
+int bar() { return 0;}
 
-int baz() {}
+int baz() { return 0;}
 
 void bar() {} /* Error: duplicate function bar */
 

@@ -26,8 +26,8 @@ rule token = parse
 | '/'      { DIVIDE }
 | '%'      { MODULO }
 | '^'      { POWER }
-| "++"     { SELFPLUS }
-| "--"     { SELFMINUS }
+| "++" (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm)  { SELFPLUS(lxm) }
+| "--" (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm)  { SELFMINUS(lxm) }
 | ".*"     { MATMUL }
 | '='      { ASSIGN }                   (* assign *)
 | "=="     { EQ }                       (* logical *)

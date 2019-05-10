@@ -43,7 +43,7 @@ let bind_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE INCLUDE
 %token SEMI COMMA DOT COLON
-%token PLUS MINUS TIMES DIVIDE MODULO POWER SELFPLUS SELFMINUS MATMUL QUOTE
+%token PLUS MINUS TIMES DIVIDE MODULO POWER MATMUL QUOTE
 %token ASSIGN
 %token EQ NEQ LT LEQ GT GEQ AND OR NOT
 %token IF ELSE FOR WHILE RETURN
@@ -52,7 +52,7 @@ let bind_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_
 
 %token <int> LITERAL
 %token <bool> BLIT
-%token <string> ID FLIT STRLIT
+%token <string> ID FLIT STRLIT SELFPLUS SELFMINUS
 %token <char> CHARLIT
 %token EOF
 
@@ -71,7 +71,6 @@ let bind_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_
 %left QUOTE
 %right NOT                        /* precedence level: 14 */
 %left DOT
-%nonassoc SELFPLUS SELFMINUS      /* precedence level: 15 */
 
 %%
 
@@ -95,6 +94,7 @@ decls:
  | typ id_list SEMI { bind_glb_list $1 $2 }
  | decls vdecl { Globaldcl($2) :: $1 }
  | decls fdecl { Func($2) :: $1 }
+ | decls typ id_list SEMI { (bind_glb_list $2 $3) @ $1}
  | decls fdecl_bodyless { Func_dcl($2) :: $1 }
  | decls struct_dcl {Struct_dcl($2) :: $1 }
 
@@ -214,8 +214,8 @@ expr:
   | expr DIVIDE expr { Binop($1, Div,   $3)   }
   | expr MODULO expr { Binop($1, Mod,   $3)   }
   | expr POWER  expr { Binop($1, Pow,   $3)   }
-  | SELFPLUS ID      { Assign($2, Binop(Id($2), Add, Literal(1))) }
-  | SELFMINUS ID     { Assign($2, Binop(Id($2), Sub, Literal(1))) }
+  | SELFPLUS         { Assign($1, Binop(Id($1), Add, Literal(1))) }
+  | SELFMINUS        { Assign($1, Binop(Id($1), Sub, Literal(1))) }
   | expr MATMUL expr { Binop($1, Matmul,   $3)}
   | expr EQ     expr { Binop($1, Equal, $3)   }
   | expr NEQ    expr { Binop($1, Neq,   $3)   }
