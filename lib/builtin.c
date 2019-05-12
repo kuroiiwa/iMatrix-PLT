@@ -538,8 +538,7 @@ struct mat* __matTranspose(const struct mat* m) {
 	struct mat* res = malloc_mat(r, c);
 	for (int i = 0; i < c; i++)
 		for (int j = 0; j < r; j++)
-			res->data[i * r + j] = accMat(m, i, j);
-
+			res->data[j * r + i] = accMat(m, i, j);
 	return res;
 }
 
