@@ -740,8 +740,7 @@ let translate program =
         let des = L.build_load (lookup local_vars s) s builder in
         if L.type_of des = mat_t then
           (match t with
-            | A.Mat -> ignore(L.build_store e' (lookup local_vars s) builder);
-              L.build_load (lookup local_vars s) "_t" builder
+            | A.Mat -> ignore(L.build_store e' (lookup local_vars s) builder); e'
             | A.Array(_) ->
           let ar = extDim t in
           L.build_call (builtin_f "__setMat") [| des; e'; L.const_int i32_t ar.(0);  L.const_int i32_t ar.(1)|] "__setMat" builder
@@ -749,14 +748,13 @@ let translate program =
           )
         else if L.type_of des = img_t then
           (match t with
-            | A.Img -> ignore(L.build_store e' (lookup local_vars s) builder);
-              L.build_load (lookup local_vars s) "_t" builder
+            | A.Img -> ignore(L.build_store e' (lookup local_vars s) builder); e'
             | A.Array(_) -> raise NotImplemented
             | _ -> raise(InternalError("Assign type failure"))
           )
         else(
-          ignore(L.build_store e' (lookup local_vars s) builder);
-          L.build_load (lookup local_vars s) "_t" builder)
+          ignore(L.build_store e' (lookup local_vars s) builder); e'
+        )
       | SSliceAssign (v, lst, e) ->
         let des = L.build_load (lookup local_vars v) v builder in
         set_slice_opt (local_vars, builder) (des, lst, e) ty
@@ -977,7 +975,12 @@ let translate program =
 
       (* local declarations generation *)
     and add_local (local_vars , builder) (t, n, e) =
-      let local_var = L.build_alloca (ltype_of_typ t) n builder in
+      let entry = L.entry_block the_function in
+      let builder_local = match L.block_terminator entry with
+        | Some instr -> L.builder_before context instr
+        | None -> builder
+      in
+      let local_var = L.build_alloca (ltype_of_typ t) n builder_local in
       let (_, _t) = e in
       let () = match _t,t with
         | SNoexpr,_ -> ignore(local_type_zeroinitializer local_var builder t);()
@@ -1001,5 +1004,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
-(*   ignore(L.dump_module the_module); *)
+  ignore(L.dump_module the_module);
   the_module

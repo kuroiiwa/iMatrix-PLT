@@ -160,9 +160,6 @@ func_body_list:
   | func_body_list vdecl { Dcl($2) :: $1 }
   | func_body_list typ id_list SEMI { (bind_list $2 $3) @ $1 }
 
-stmt_list:
-  | /* nothing */ { [] }
-  | stmt_list stmt { Stmt($2) :: $1 }
 
 vdecl:
   | typ ID ASSIGN expr SEMI  { bind_dcl $1 $2 $4 }
@@ -184,7 +181,7 @@ dimension:
 stmt:
     expr SEMI                               { Expr $1               }
   | RETURN expr_opt SEMI                    { Return $2             }
-  | LBRACE stmt_list RBRACE                 { Block(List.rev $2)    }
+  | LBRACE func_body_list RBRACE                 { Block(List.rev $2)    }
   | IF LPAREN expr RPAREN stmt %prec NOELSE { If($3, $5, Block([])) }
   | IF LPAREN expr RPAREN stmt ELSE stmt    { If($3, $5, $7)        }
   | FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN stmt

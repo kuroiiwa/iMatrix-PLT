@@ -28,6 +28,8 @@ rule token = parse
 | '^'      { POWER }
 | "++" (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm)  { SELFPLUS(lxm) }
 | "--" (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm)  { SELFMINUS(lxm) }
+| (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm) "++"  { SELFPLUS(lxm) }
+| (['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm) "--"  { SELFMINUS(lxm) }
 | ".*"     { MATMUL }
 | '='      { ASSIGN }                   (* assign *)
 | "=="     { EQ }                       (* logical *)
