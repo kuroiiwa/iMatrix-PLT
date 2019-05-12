@@ -1,12 +1,22 @@
 (* Ocamllex scanner for MicroC *)
 
-{ open Microcparse }
+{ open Microcparse
+  open Lexing
+
+let next_line lexbuf =
+  let pos = lexbuf.lex_curr_p in
+  lexbuf.lex_curr_p <-
+    { pos with pos_bol = lexbuf.lex_curr_pos;
+               pos_lnum = pos.pos_lnum + 1
+    }
+ }
 
 let digit = ['0' - '9']
 let digits = digit+
 
 rule token = parse
-  [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
+  [' ' '\t'] { token lexbuf } (* Whitespace *)
+| [ '\r' '\n'] {next_line lexbuf; token lexbuf}
 | "/*"     { comment lexbuf }           (* Comments *)
 | "//"     { inlinecom lexbuf }
 | "include" { INCLUDE }

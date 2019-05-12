@@ -1004,5 +1004,5 @@ let translate program =
   in
 
   List.iter build_function_body functions;
-  ignore(L.dump_module the_module);
+  (* ignore(L.dump_module the_module); *)
   the_module

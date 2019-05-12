@@ -1,8 +1,15 @@
 (* Top-level of the MicroC compiler: scan & parse the input,
    check the resulting AST and generate an SAST from it, generate LLVM IR,
    and dump the module *)
+open Printf
+open Lexing
 
 type action = Ast | Sast | LLVM_IR | Compile
+
+let print_position outx lexbuf =
+  let pos = lexbuf.lex_curr_p in
+  let str = lexeme lexbuf in
+    fprintf outx "character \"%s\" at line %d" str pos.pos_lnum
 
 let () =
   let action = ref Compile in
@@ -20,7 +27,15 @@ let () =
 
   let rec parse_ast file =
     let lexbuf = Lexing.from_channel file in
-    let (files, ast_main) = Microcparse.program Scanner.token lexbuf in
+    let (files, ast_main) =
+      try
+        Microcparse.program Scanner.token lexbuf
+      with
+        | Parsing.Parse_error ->
+          fprintf stderr "%a: syntax error\n" print_position lexbuf;
+          exit (-1)
+        | exn -> raise exn
+    in
       let parse_file l fn =
          let buf = open_in fn in
          l @ parse_ast buf in
