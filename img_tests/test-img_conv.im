@@ -1,0 +1,22 @@
+include "../lib/imlib.im"
+
+int main()
+{
+	img in = readimg("../generated_images/puppy.jpg");
+
+	int conv_w = 5;
+	img conv(conv_w, conv_w);
+	int i, j, k;
+	for (i = 0; i < conv_w; ++i) {
+		for (j = 0; j < conv_w; ++j) {
+			for (k = 0; k < 3; ++k) {
+				conv[i][j][k] = i;
+			}
+		}
+	}
+	img out = img_conv(in, conv);
+		
+	saveimg("../generated_images/img_conv.jpg", out);
+
+	return 0;
+}

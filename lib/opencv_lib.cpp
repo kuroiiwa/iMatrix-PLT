@@ -39,3 +39,44 @@ extern "C" void showimg(struct img* image) {
     imshow("Display", tmp);
     waitKey(0);
 }
+
+extern "C" struct mat* invert(struct mat* m) {
+    Mat input(m->row, m->col, CV_64F, m->data);
+    Mat output(m->row, m->col, CV_64F);
+    double success = invert(input, output, DECOMP_LU);
+    if (!success)
+        printf("This matrix is not inversable");
+
+    struct mat* result = malloc_mat(m->row, m->col);
+    memcpy(result->data, output.data, sizeof(double) * m->row * m->col);
+
+    return result;
+//    return nullptr;
+}
+
+extern "C" struct mat* eigen_vector(struct mat* m) {
+    Mat input(m->row, m->col, CV_64F, m->data);
+    Mat eigenvalue(m->row, 1, CV_64F);
+    Mat eigenvector(m->row, m->col, CV_64F);
+    bool success = eigen(input, eigenvalue, eigenvector);
+    if (!success)
+        printf("Not able to compute the eigenvalue / eigenvector of this matrix");
+    
+    struct mat* result = malloc_mat(m->row, m->col);
+    memcpy(result->data, eigenvector.data, sizeof(double) * m->row * m->col);
+    
+    return result;
+}
+
+extern "C" struct mat* eigen_value(struct mat* m) {
+    Mat input(m->row, m->col, CV_64F, m->data);
+    Mat eigenvalue(m->row, 1, CV_64F);
+    bool success = eigen(input, eigenvalue);
+    if (!success)
+        printf("Not able to compute the eigenvalue / eigenvector of this matrix");
+    
+    struct mat* result = malloc_mat(m->row, 1);
+    memcpy(result->data, eigenvalue.data, sizeof(double) * m->row);
+    
+    return result;
+}

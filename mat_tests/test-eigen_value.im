@@ -1,0 +1,12 @@
+
+int main()
+{
+	mat m(3,3);
+    m = [[1.,2.,-1.],[-2.,0.,1.],[1.,-1.,0.]];
+    mat b = eigen_value(m);
+		
+	print(m);
+	print(b);
+
+	return 0;
+}

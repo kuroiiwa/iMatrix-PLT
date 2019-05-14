@@ -16,5 +16,6 @@ struct mat {
 };
 
 struct img* malloc_img(int row, int col);
+struct mat* malloc_mat(int row, int col);
 
 #endif

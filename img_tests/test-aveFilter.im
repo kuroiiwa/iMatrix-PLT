@@ -1,0 +1,11 @@
+include "../lib/imlib.im"
+
+
+int main() {
+	img a = readimg("../lib/puppy.jpg");
+
+	img aveFilter = aveFilter(a, 5);
+	saveimg("../generated_images/aveFilter.jpg", aveFilter);
+
+	return 0;
+}
