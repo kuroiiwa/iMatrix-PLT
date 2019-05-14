@@ -1,18 +1,30 @@
+// test for struct of {int, float, char, array, mat}
 struct test {
-	int a;
+	int   a;
 	float b;
-	char c;
+	char  c;
+	int   d[10];
+	mat   e;
 };
 
 int main() {	
-	struct test simple;
-	simple.a = 1;
-	simple.b = 2.0;
-	simple.c = 'a';
+	struct test s;
+	s.a = 1;
+	s.b = 2.0;
+	s.c = 'a';
+	int i;
+	for (i = 0; i < 10; ++i)
+		s.d[i] = i;
+	s.e = malloc_mat(2, 3);
+	matAssign(s.e, 1.0);
 
-	print(simple.a);
-	print(simple.b);
-	print(simple.c);
+	print(s.a);
+	print(s.b);
+	print(s.c);
+	for (i = 0; i < 10; ++i)
+		print(s.d[i]);
+	print(s.e);
+	//print(s);
 
 	return 0;
 }

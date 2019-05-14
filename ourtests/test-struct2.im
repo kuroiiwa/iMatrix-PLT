@@ -1,19 +1,45 @@
+// test for struct of struct
 struct inside {
 	int a;	
 };
 
 struct test {
 	int a;
-	float b;
-	char c;
-	struct inside d;
+	struct inside b;
+	struct inside c[5];
 };
 
-int main() {	
-	struct test simple;
-	simple.d.a = 1;
+int main() {
+	struct test s;
+	s.a = 1;
+	s.b.a = 2;
+	int i = 0;
+	print(s.a);
+	print(s.b.a);
+	for (i = 0; i < 5; ++i)
+		s.c[i].a = i;
+	for (i = 0; i < 5; ++i)
+		print(s.c[i].a);
 
-	print(simple.d.a);
+	// try to assign a struct to another
+	struct test s2;
+	s2 = s;
+	print("s2 value:");
+	print(s2.a);
+	print(s2.b.a);
+	for (i = 0; i < 5; ++i)
+		print(s2.c[i].a);
+
+	// modify the copy to see the change in origin struct instance
+	s2.a = 3;
+	s2.b.a = 4;
+	for (i = 0; i < 5; ++i)
+		s2.c[i].a = i*2;
+	print("s value:");
+	print(s.a);
+	print(s.b.a);
+	for (i = 0; i < 5; ++i)
+		print(s.c[i].a);
 
 	return 0;
 }

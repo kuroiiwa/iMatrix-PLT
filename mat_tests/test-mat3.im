@@ -1,0 +1,13 @@
+// mat copy
+
+int main()
+{
+	mat a(2,3);
+	mat b(3,2);
+	matAssign(a, 2.0);
+	b = a;
+	print(b);
+	matAssign(b, 3.0);
+	print(a);
+	return 0;
+}

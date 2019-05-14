@@ -1,0 +1,13 @@
+int main()
+{
+	mat a;
+	a = malloc_mat(2,4);
+	print(a);
+
+	mat b(2,2);
+	b = [[1.0,2.0],[3.0,4.0]];
+	print(b);
+	print(b[0][1]);
+
+	return 0;
+}

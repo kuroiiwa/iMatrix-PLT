@@ -1,0 +1,19 @@
+// struct of different type
+
+struct test1{
+	int a;
+};
+
+struct test2{
+	int a;
+};
+
+int main()
+{
+	struct test1 v1;
+	struct test2 v2;
+	v1.a = 1;
+	v2 = v1;
+
+	return 0;
+}

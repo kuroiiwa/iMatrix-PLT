@@ -1,0 +1,25 @@
+// mat function
+
+void set_val (mat a, float val)
+{
+	int i;
+	int j;
+	for (i = 0; i < row(a); ++i)
+		for (j = 0; j < col(a); ++j)
+			a[i][j] = val;
+}
+
+float get_val (mat a, int i, int j)
+{
+	if (i<row(a)&&j<col(a)) return a[i][j];
+	else return 0.0;
+}
+
+
+int main()
+{
+	mat a(2,3);
+	set_val(a, 2.0);
+	print(get_val(a, 1, 1));
+	return 0;
+}

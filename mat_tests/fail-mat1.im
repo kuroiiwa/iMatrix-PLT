@@ -1,0 +1,9 @@
+// illegal slicing
+int main()
+{
+	mat a(2,2);
+	a = [[1.0, 2.0], [3.0, 4.0]];
+	print(a[0]);
+
+	return 0;
+}

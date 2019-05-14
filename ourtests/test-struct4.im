@@ -1,18 +1,26 @@
-struct test1 {
-	int c;
+// struct function
+struct test{
+	int a;
 };
 
-struct test {
-	struct test1 a[10];
-};
+void set_a (struct test v, int val)
+{
+	v.a = val;
+}
 
-int main() {	
-	struct test simple;
-	int i;
-	for (i = 0; i < 10; ++i)
-		simple.a[i].c = i;
-	for (i = 0; i < 10; ++i)
-		print(simple.a[i].c);
+int get_a (struct test v)
+{
+	return v.a;
+}
 
+int main()
+{
+	struct test v;
+	print(v.a);
+	set_a(v, 2);
+	print(get_a(v));
+	v.a = 2;
+	print(v.a);
+	
 	return 0;
 }
