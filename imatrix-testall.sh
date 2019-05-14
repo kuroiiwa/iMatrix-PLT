@@ -20,8 +20,8 @@ CLANGFLAGS="-O2 -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcode
 TESTDIR="./testbuild"
 
 TESTFILESDIR=./ourtests
-TESTFILES=$TESTFILESDIR/test-*.im
-FAILFILES=$TESTFILESDIR/fail-*.im
+TESTFILES="$TESTFILESDIR/test-*.im ./tests/test-*.im"
+FAILFILES="$TESTFILESDIR/fail-*.im ./tests/fail-*.im"
 
 ulimit -t 30
 globallog=testall.log
