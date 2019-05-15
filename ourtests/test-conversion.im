@@ -1,0 +1,12 @@
+int main() {
+    float b = 1;
+    print(b);
+
+    int a = 10;
+    b = int2float(a);
+    print(b);
+
+    float bb[5] = [1,2,3,4,5];
+    print(bb);
+    return 0;
+}

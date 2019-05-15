@@ -1,0 +1,13 @@
+struct test{
+    int a, b;
+
+};
+int main() {
+    struct test a, b;
+    a.a = 10;
+    b.b = a.a;
+
+    print(a.a);
+    print(b.b);
+    return 0;
+}

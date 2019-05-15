@@ -38,6 +38,8 @@ let bind_list typ id_l = List.map (fun id -> Dcl(typ, id, Noexpr)) id_l
 
 let bind_glb_list typ id_l = List.map (fun id -> Globaldcl(typ, id, Noexpr)) id_l
 
+let bind_list_ty_struct typ id_l = List.map (fun id -> (typ, id)) id_l
+
 %}
 
 
@@ -108,7 +110,9 @@ struct_dcl:
 
 struct_list:
   | struct_mem    { [$1] }
+  | typ id_list SEMI { (bind_list_ty_struct $1 $2) }
   | struct_list struct_mem { $2 :: $1 }
+  | struct_list typ id_list SEMI { (bind_list_ty_struct $2 $3) @ $1 }
 
 struct_mem:
   | typ ID SEMI { let (t,id,_) = bind_dcl $1 $2 Noexpr in (t, id)}

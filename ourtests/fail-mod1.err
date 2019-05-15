@@ -1,0 +1,1 @@
+Fatal error: exception Failure("illegal binary operator float % float in 10.0 % 2.0")
