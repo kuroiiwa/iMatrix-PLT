@@ -1,0 +1,11 @@
+include "../lib/imlib.im"
+
+int main()
+{
+	img in = readimg("../generated_images/puppy.jpg");
+	img out = addconst_img(in, 30);
+		
+	saveimg("../generated_images/addconst_img.jpg", out);
+
+	return 0;
+}

@@ -1,0 +1,11 @@
+include "../lib/imlib.im"
+
+
+int main() {
+	img a = readimg("../generated_images/puppy.jpg");
+
+	img edgeDetection = edgeDetection(a, 30);
+	saveimg("../generated_images/edgeDetection.jpg", edgeDetection);
+
+	return 0;
+}

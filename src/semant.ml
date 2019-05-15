@@ -451,6 +451,9 @@ let check program =
       (Img,   "readimg",      [String]);
       (Void,  "saveimg",      [String; Img]);
       (Void,  "showimg",      [Img]);
+      (Mat,   "invert",       [Mat]);
+      (Mat,   "eigen_vector", [Mat]);
+      (Mat,   "eigen_value", [Mat]);
       (Char,  "float2char",  [Float]);
       (Int,   "float2int",   [Float]);
       (Char,  "int2char",    [Int]);

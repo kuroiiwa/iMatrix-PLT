@@ -1,0 +1,61 @@
+include "./lib/imlib.im"
+
+img myAveFilter(img imgIn, int fWidth) {
+	int row = row(imgIn);
+	int col = col(imgIn);
+
+	img imgOut(row, col);
+
+	int i,j,k;
+
+	for (i = 0; i < row; ++i) {
+		for (j = 0; j < col; ++j) {
+			for (k = 0; k < 3; ++k) {
+				int count = 0;
+				int sum = 0;
+				int m, n;
+				for (m = -fWidth; m <= fWidth; ++m) {
+					for (n = -fWidth; n <= fWidth; ++n) {
+						if (i + m >= 0 && i + m < row - 1
+							&& j + n >= 0 && j + n < col - 1) {
+							++count;
+							int ii = i + m;
+							int jj = j + n;
+							sum = sum + imgIn[ii][jj][k];
+						}
+					}
+				}
+				int aveResult = sum / count;
+				imgOut[i][j][k] = aveResult;
+			}
+		}
+	}
+	return imgOut;
+}
+
+struct output_images {
+	img aveFilter;
+	img regularization;
+};
+
+struct image_wrapper {
+	img input;
+	struct output_images output;
+};
+
+int main() {
+
+	struct image_wrapper images;
+	images.input = readimg("./lib/puppy.jpg");
+	images.output.aveFilter = myAveFilter(images.input, 10);
+	images.output.regularization = RBG_regularization(images.input);
+
+	showimg(images.input);
+	showimg(images.output.aveFilter);
+	showimg(images.output.regularization);
+
+	return 0;
+}
+
+
+

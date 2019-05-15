@@ -211,6 +211,9 @@ let translate program =
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
       ("showimg",       A.Void, i32_t, [| img_t |]);
+      ("invert",        A.Mat,  mat_t, [| mat_t |]);
+      ("eigen_vector",  A.Mat,  mat_t, [| mat_t |]);
+      ("eigen_value",  A.Mat,  mat_t, [| mat_t |]);
       ("float2int",     A.Int,  i32_t, [| float_t|]);
       ("float2char",    A.Char, i8_t,  [| float_t|]);
       ("int2float",     A.Float,float_t, [|i32_t|]);
