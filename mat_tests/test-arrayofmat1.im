@@ -1,0 +1,7 @@
+int main()
+{
+	mat a[3];
+	a[0] = malloc_mat(2,3);
+	print(a[0]);
+	return 0;
+}

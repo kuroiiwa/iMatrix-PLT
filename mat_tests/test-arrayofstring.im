@@ -1,0 +1,8 @@
+// not support yet
+int main()
+{
+	string s[2];
+	s[0] = "abc";
+	print(s[0]);
+	return 0;
+}

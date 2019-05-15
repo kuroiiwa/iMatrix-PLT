@@ -1,0 +1,12 @@
+// array function
+int get(int a[3], int n)
+{
+	return a[n];
+}
+int main()
+{
+	int a[3];
+	a[:] = [0,1,2];
+	print(get(a,0));
+	return 0;
+}

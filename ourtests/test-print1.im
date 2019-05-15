@@ -1,22 +1,11 @@
 int main() {
-	int a;
-	float b;
-	bool c;
-	char d;
-	string e;
-
-	a = 1;
-	b = 2.0;
-	c = true;
-	d = 'd';
-	e = "e";
-
-	print(a);
-	print(b);
-	print(c);
-	print(d);
-	print(e);
-
+	print(1);
+	print(2.0);
+	print(true);
+	print('d');
+	print("e");
+	print([1,2,3]);
+	print(malloc_mat(2,3));
 
 	return 0;
 }
