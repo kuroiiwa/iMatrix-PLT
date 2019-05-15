@@ -478,11 +478,10 @@ struct mat* matAssign(struct mat* m, double val) {
 
 struct mat* __matOperator(const struct mat* m1, const struct mat* m2, char op) {
 	assert(m1 != NULL && m2 != NULL);
+	if (op == 'm')
+			return __matMul(m1, m2);
 	assert(m1->row==m2->row);
 	assert(m1->col==m2->col);
-	if (op == 'm') {
-		return __matMul(m1, m2);
-	}
 	int r = m1->row, c = m1->col;
 	struct mat* m3 = malloc_mat(r, c);
 	for (int i = 0; i < r; ++i)
@@ -518,14 +517,22 @@ struct img* __imgOperator(const struct img* m1, const struct img* m2, char op) {
 			for (int k = 0; k < 3; ++k)
 				switch (op)
 				{
-					case '+': m3->data[3 * (r * m3->col + c) + k] =
-					m1->data[3 * (r * m1->col + c) + k] + m2->data[3 * (r * m2->col + c) + k]; break;
-					case '-': m3->data[3 * (r * m3->col + c) + k] =
-					m1->data[3 * (r * m1->col + c) + k] - m2->data[3 * (r * m2->col + c) + k]; break;
-					case '*': m3->data[3 * (r * m3->col + c) + k] =
-					m1->data[3 * (r * m1->col + c) + k] * m2->data[3 * (r * m2->col + c) + k]; break;
-					case '/': m3->data[3 * (r * m3->col + c) + k] =
-					m1->data[3 * (r * m1->col + c) + k] / m2->data[3 * (r * m2->col + c) + k]; break;
+					case '+': {
+					int tmp = (int)accImg(m1,i,j,k) + (int)accImg(m2,i,j,k);
+					accImg(m3,i,j,k) = tmp > 255 ? 255 : (unsigned char)tmp; break;
+					}
+					case '-': {
+					int tmp = (int)accImg(m1,i,j,k) - (int)accImg(m2,i,j,k);
+					accImg(m3,i,j,k) = tmp > 255 ? 255 : (unsigned char)tmp; break;
+					}
+					case '*': {
+					int tmp = (int)accImg(m1,i,j,k) * (int)accImg(m2,i,j,k);
+					accImg(m3,i,j,k) = tmp > 255 ? 255 : (unsigned char)tmp; break;
+					}
+					case '/': {
+					int tmp = (int)accImg(m1,i,j,k) / (int)accImg(m2,i,j,k);
+					accImg(m3,i,j,k) = tmp > 255 ? 255 : (unsigned char)tmp; break;
+					}
 					default: break;
 				}
 	return m3;
@@ -547,12 +554,13 @@ static void __copyMat(const struct mat* src, struct mat* des) {
 }
 struct mat* __matPower(const struct mat* m, int p) {
 	assert(m != NULL && m->row == m->col);
-	assert(p > 0);
 
 	int r = m->row, c = m->col;
 	struct mat* unit = malloc_mat(r, c);
 	for (int i = 0; i < r; i++)
 		accMat(unit, i, i) = 1;
+	if (p == 0)
+		return unit;
 	struct mat* tmp;
 	for (int i = 0; i < p; i++) {
 		if (i > 0) free_mat(tmp);

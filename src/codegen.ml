@@ -926,14 +926,14 @@ let translate program =
 
 
     (* zeroinitializer for local vars *)
-    and local_type_zeroinitializer des builder t = match t with
+    and local_type_zeroinitializer des (builder, builder_local) t = match t with
       | A.Int | A.Bool -> L.build_store (L.const_int (ltype_of_typ t) 0) des builder
       | A.Float -> L.build_store (L.const_float (ltype_of_typ t) 0.0) des builder
       | A.Char-> L.build_store (L.const_int (ltype_of_typ t) 0) des builder
       | A.String -> L.build_store (L.const_pointer_null string_t) des builder
       | A.Array(arr_ty, num) ->
         let store_helper builder ptr t =
-          ignore(local_type_zeroinitializer ptr builder t);
+          ignore(local_type_zeroinitializer ptr (builder, builder_local) t);
           L.build_in_bounds_gep ptr [|L.const_int i32_t 1|] "_t" builder
         in
 
@@ -944,7 +944,7 @@ let translate program =
         if norm_type arr_ty then begin
           let arrval = List.map type_zeroinitializer (gen_type_list [] arr_ty num) in
           let arr = L.const_array (ltype_of_typ arr_ty) (Array.of_list arrval) in
-          let tmp = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "_t" builder in
+          let tmp = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "_t" builder_local in
           ignore(L.build_store arr tmp builder);
           let ptr = L.build_bitcast tmp (ltype_of_typ t) "_t" builder in
           L.build_store ptr des builder
@@ -952,7 +952,7 @@ let translate program =
         else begin
 
         let ty_l = gen_type_list [] arr_ty num in
-        let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder in
+        let spc = L.build_alloca (L.array_type (ltype_of_typ arr_ty) num) "data" builder_local in
         let ptr = L.build_bitcast spc (ltype_of_typ t) "_t" builder in
 
         ignore(List.fold_left (store_helper builder) ptr ty_l);
@@ -962,7 +962,7 @@ let translate program =
       | A.Struct(_, l) ->
         let store_helper builder des (t,n) =
           let ptr = L.build_in_bounds_gep des [| L.const_int i32_t 0 ; L.const_int i32_t n|] "_t" builder in
-          local_type_zeroinitializer ptr builder t
+          local_type_zeroinitializer ptr (builder, builder_local) t
         in
         let (_, _t) = List.fold_left (fun (n,l) (ty, _) -> (n+1, (ty,n) :: l)) (0,[]) l in
         let lst_ty = List.rev _t in
@@ -986,7 +986,7 @@ let translate program =
       let local_var = L.build_alloca (ltype_of_typ t) n builder_local in
       let (_, _t) = e in
       let () = match _t,t with
-        | SNoexpr,_ -> ignore(local_type_zeroinitializer local_var builder t);()
+        | SNoexpr,_ -> ignore(local_type_zeroinitializer local_var (builder, builder_local) t);()
         | SStrLit str,_ -> ignore(L.build_store (L.build_global_stringptr str "str" builder) local_var builder); ()
         | _ -> let e' = expr (local_vars, builder) e in ignore(L.build_store e' local_var builder); ()
       in
