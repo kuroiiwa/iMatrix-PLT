@@ -1,0 +1,9 @@
+struct test {
+    int a;
+};
+int main() {
+    struct test a[5];
+    a[0].a = 5;
+    print(a[0]);
+    return 0;
+}

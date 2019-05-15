@@ -583,6 +583,9 @@ let translate program =
         and b' = expr (local_vars, builder) b
         and c' = expr (local_vars, builder) c in
         L.build_call (builtin_f "__setImgVal") [| e'; dst; a'; b'; c'|] "" builder
+      else if ty = A.Mat then
+        let e' = expr (local_vars, builder) re in
+        ignore(L.build_store e' dst builder); e'
       else set_slice (local_vars, builder) (dst, index_l, re) ty
 
     and set_slice (local_vars, builder) (dst, lst, re) ty =

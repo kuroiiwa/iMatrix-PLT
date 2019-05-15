@@ -328,7 +328,10 @@ let check program =
                      string_of_typ t2 ^ " in " ^ string_of_expr e))
       in (ty, SBinop((!t1', !re1), op, (!t2', !re2)))
     | Call("print", [e]) ->
-      (Void, SCall("print", [check_expr (var_symbols, func_symbols) e]))
+      let (ty, _) as e' = check_expr (var_symbols, func_symbols) e in
+      (match ty with
+        | Struct(_) -> raise(Failure("can not print struct at " ^ string_of_sexpr e'))
+        | _ -> (Void, SCall("print", [e'])))
     | Call("row", [e]) ->
       let e' = check_expr (var_symbols, func_symbols) e in
       let (t, _) = e' in
