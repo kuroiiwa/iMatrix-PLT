@@ -4,10 +4,12 @@ int main()
 	img b(2,4);
 	imgAssign(a, 5);
 	imgAssign(b, 2);
+	print(a);
 	print(a+b);
+	/*
 	print(a-b);
 	print(a*b);
 	print(a/b);
-		
+	*/
 	return 0;
 }
