@@ -1,4 +1,4 @@
-include "../lib/imlib.im"
+include "../../lib/imlib.im"
 
 int main()
 {

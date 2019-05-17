@@ -21,11 +21,24 @@ let () =
     ("-c", Arg.Unit (set_action Compile),
       "Check and print the generated LLVM IR (default)");
   ] in
-  let usage_msg = "usage: ./microc.native [-a|-s|-l|-c] [file.mc]" in
+  let usage_msg = "usage: ./microc.native [-a|-s|-l|-c] [file.im]" in
   let channel = ref stdin in
-  Arg.parse speclist (fun filename -> channel := open_in filename) usage_msg;
+  let main_path = ref "./" in
+  let get_path str =
+    let index = String.rindex_opt str '/' in
+    match index with
+      | Some i -> String.sub str 0 i
+      | None -> "./"
+  in
+  let get_file filename =
+    main_path := get_path filename;
+    channel := open_in filename
+  in
+  Arg.parse speclist get_file usage_msg;
 
-  let rec parse_ast file fn =
+  let () = Sys.chdir !main_path in
+
+  let rec parse_ast file fn dir =
     let lexbuf = Lexing.from_channel file in
     let (files, ast_main) =
       try
@@ -36,13 +49,18 @@ let () =
           exit (-1)
         | exn -> raise exn
     in
-      let parse_file l fn =
-         let buf = open_in fn in
-         l @ parse_ast buf fn in
-      let include_asts = List.fold_left parse_file [] files in
+    let parse_file l fn =
+      let cwd = Sys.getcwd () in
+      let path = get_path fn in
+      let buf = open_in fn in
+      let () = Sys.chdir path in
+      l @ parse_ast buf fn cwd
+    in
+    let include_asts = List.fold_left parse_file [] files in
+    let () = Sys.chdir dir in
     include_asts @ ast_main
   in
-  let ast = parse_ast !channel "main" in
+  let ast = parse_ast !channel "main" "./" in
   match !action with
     Ast -> print_string (Ast.string_of_program ast)
   | _ -> let sast = Semant.check ast in
