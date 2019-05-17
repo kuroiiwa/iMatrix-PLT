@@ -115,7 +115,7 @@ struct_list:
   | struct_list typ id_list SEMI { (bind_list_ty_struct $2 $3) @ $1 }
 
 struct_mem:
-  | typ ID SEMI { let (t,id,_) = bind_dcl $1 $2 Noexpr in (t, id)}
+
   | typ ID LBRACK dim_opt RBRACK SEMI { let (t,id,_) =  bind_arr_dcl_noexpr $1 $2 $4 in (t,id)}
 
 
@@ -129,9 +129,9 @@ fdecl_bodyless:
 fdecl:
    typ ID LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE
      { { typ = $1;
-	 fname = $2;
-	 formals = List.rev $4;
-	 body = List.rev $7 }}
+     fname = $2;
+     formals = List.rev $4;
+     body = List.rev $7 }}
 
 formals_opt:
     /* nothing */ { [] }
@@ -198,7 +198,7 @@ expr_opt:
 
 expr:
     LITERAL          { Literal($1)            }
-  | FLIT	           { Fliteral($1)           }
+  | FLIT             { Fliteral($1)           }
   | BLIT             { BoolLit($1)            }
   | STRLIT           { StrLit($1)             }
   | CHARLIT          { CharLit($1)            }
@@ -235,18 +235,6 @@ expr:
   | ID slice_opt ASSIGN expr { SliceAssign($1, $2, $4) }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  }
   | LPAREN expr RPAREN { $2                   }
-
-/*
-lamb_expr:
-  | LPAREN lamb_ret_typ LPAREN formals_opt RPAREN LBRACE func_body_list RBRACE RPAREN {  }
-
-lamb_ret_typ:
-    LITERAL          { Literal($1)            }
-  | FLIT             { Fliteral($1)           }
-  | BLIT             { BoolLit($1)            }
-  | STRLIT           { StrLit($1)             }
-  | CHARLIT          { CharLit($1)            } */
-
 
 struct_member_opt:
   | struct_member DOT struct_member     { GetMember($1, $3)      }
@@ -326,5 +314,4 @@ arr_ele:
   | NOT arr_ele         { Unop(Not, $2)          }
   | ID LPAREN args_opt RPAREN { Call($1, $3)  } /* might need to be forbidden */
   | LPAREN arr_ele RPAREN { $2                   }
-
 

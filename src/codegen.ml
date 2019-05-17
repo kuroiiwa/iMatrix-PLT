@@ -206,8 +206,6 @@ let translate program =
       ("repMat",         A.Mat,  mat_t, [| float_t; i32_t; i32_t|]);
       ("matAssign",     A.Mat,  mat_t, [| mat_t; float_t |]);
       ("imgAssign",     A.Img,  img_t, [| img_t; i32_t |]);
-(*       ("aveFilter",     A.Img,  img_t, [| img_t; i32_t |]); *)
-(*       ("edgeDetection", A.Img,  img_t, [| img_t; i32_t |]); *)
       ("readimg",       A.Img,  img_t, [| string_t |]);
       ("saveimg",       A.Void, i32_t, [| string_t; img_t|]);
       ("showimg",       A.Void, i32_t, [| img_t |]);

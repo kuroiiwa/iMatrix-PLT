@@ -19,9 +19,13 @@ CLANGFLAGS="-O2 -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcode
 
 TESTDIR="./testbuild"
 
-TESTFILESDIR=./ourtests
-TESTFILES="$TESTFILESDIR/test-*.im ./tests/test-*.im"
-FAILFILES="$TESTFILESDIR/fail-*.im ./tests/fail-*.im"
+DIR1="./tests/microc-tests"
+DIR2="./tests/tests-array"
+DIR3="./tests/tests-mat"
+DIR4="./tests/tests"
+DIR5="./tests/test-struct"
+TESTFILES="$DIR1/test-*.im $DIR2/test-*.im $DIR3/test-*.im $DIR4/test-*.im $DIR5/test-*.im"
+FAILFILES="$DIR1/fail-*.im $DIR2/fail-*.im $DIR3/fail-*.im $DIR4/fail-*.im $DIR5/fail-*.im"
 
 ulimit -t 30
 globallog=testall.log

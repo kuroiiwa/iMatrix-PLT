@@ -2,11 +2,11 @@
 
 make -C ./lib/
 
-DESDIR=""
+DESDIR="./"
 
 if [ $3 -eq 1 ]; then
 	echo "desdir changed"
-	DESDIR="./ourtests"
+	DESDIR="./mat_tests"
 	echo $DESDIR
 fi
 ./imatrix $1 > tmp.ll || {
